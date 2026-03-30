@@ -244,9 +244,9 @@
                     button.disabled = true;
                     break;
                 case Utils.CONSTANTS.FEEDBACK_SUBMITTED:
-                    button.textContent = window.i18nManager ? window.i18nManager.t('buttons.submitted') : '已提交';
-                    button.className = 'btn btn-success';
-                    button.disabled = true;
+                    button.textContent = window.i18nManager ? window.i18nManager.t('buttons.submitQueue', '📨 排隊發送') : '📨 排隊發送';
+                    button.className = 'btn btn-warning combined-submit-btn';
+                    button.disabled = false;
                     break;
             }
         });
@@ -257,10 +257,10 @@
      */
     UIManager.prototype.updateFeedbackInputs = function() {
         const feedbackInput = Utils.safeQuerySelector('#combinedFeedbackText');
-        const canInput = this.feedbackState === Utils.CONSTANTS.FEEDBACK_WAITING;
 
         if (feedbackInput) {
-            feedbackInput.disabled = !canInput;
+            // 允許在提交後/處理中繼續輸入，避免影響後續輸入體驗
+            feedbackInput.disabled = false;
         }
     };
 
@@ -494,9 +494,8 @@
                 feedbackInput.value = '';
                 console.log('📝 已清空文字內容');
             }
-            // 只有在等待狀態才啟用輸入框
-            const canInput = this.feedbackState === Utils.CONSTANTS.FEEDBACK_WAITING;
-            feedbackInput.disabled = !canInput;
+            // 保持輸入框可用，避免提交後鎖定
+            feedbackInput.disabled = false;
         }
 
         // 重新啟用提交按鈕
