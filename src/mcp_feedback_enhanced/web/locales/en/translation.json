@@ -658,5 +658,19 @@
     "restartServerConfirm": "Restart the web server? The page will briefly disconnect.",
     "restartServerSuccess": "Web server is restarting, please wait...",
     "restartServerError": "Restart failed, please restart opencode manually"
+  },
+  "history": {
+    "title": "History",
+    "refresh": "Refresh",
+    "loading": "Loading...",
+    "empty": "No history yet",
+    "noRecords": "No records in this group",
+    "currentSession": "Current Session",
+    "items": "items",
+    "inProgress": "In Progress",
+    "detail": "Detail",
+    "summaryLabel": "AI Summary",
+    "feedbackLabel": "User Feedback",
+    "projectDir": "Project Directory"
   }
 }

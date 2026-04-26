@@ -137,6 +137,10 @@ class WebUIManager:
         self._uvicorn_server: uvicorn.Server | None = None  # uvicorn 實例引用，用於熱重啟
         self.desktop_app_instance: Any = None  # 桌面應用實例引用
 
+        # 進程會話 ID：標識本次 opencode 進程的唯一 ID，用於歷史記錄分組
+        self.process_session_id: str = str(uuid.uuid4())
+        self.process_started_at: str = datetime.now().isoformat()
+
         # 初始化標記，用於追蹤異步初始化狀態
         self._initialization_complete = False
         self._initialization_lock = threading.Lock()

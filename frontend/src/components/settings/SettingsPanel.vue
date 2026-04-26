@@ -1,6 +1,9 @@
 <template>
   <div class="settings-panel">
-    <h3 class="settings-panel__title">{{ i18n.t('settings.title') }}</h3>
+    <div class="settings-panel__header">
+      <h3 class="settings-panel__title">{{ i18n.t('settings.title') }}</h3>
+      <button class="settings-panel__close" @click="emit('close')" title="关闭">✕</button>
+    </div>
 
     <!-- Theme -->
     <div class="settings-panel__row">
@@ -105,6 +108,7 @@ import { useSettingsStore } from '../../stores/settings'
 import { useTimeout } from '../../composables/useTimer'
 import { api } from '../../api/http'
 
+const emit = defineEmits<{ close: [] }>()
 const i18n = useI18nStore()
 const settingsStore = useSettingsStore()
 const settings = computed(() => settingsStore.settings)
@@ -161,13 +165,34 @@ async function restartServer() {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.settings-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
 }
 
 .settings-panel__title {
   color: var(--text-primary);
   font-size: 1rem;
-  margin: 0 0 0.5rem;
+  margin: 0;
 }
+
+.settings-panel__close {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 1rem;
+  padding: 0 0.4rem;
+  cursor: pointer;
+  line-height: 1.6;
+}
+.settings-panel__close:hover { color: var(--text-primary); }
 
 .settings-panel__row {
   display: flex;

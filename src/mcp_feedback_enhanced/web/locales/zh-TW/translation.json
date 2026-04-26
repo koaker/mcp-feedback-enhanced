@@ -663,5 +663,19 @@
     "restartServerConfirm": "確定要重啟 Web 伺服器嗎？頁面將短暫斷線。",
     "restartServerSuccess": "Web 伺服器正在重啟，請稍候...",
     "restartServerError": "重啟失敗，請手動重啟 opencode"
+  },
+  "history": {
+    "title": "歷史記錄",
+    "refresh": "重新整理",
+    "loading": "載入中...",
+    "empty": "尚無歷史記錄",
+    "noRecords": "本組無記錄",
+    "currentSession": "本次會話",
+    "items": "筆",
+    "inProgress": "進行中",
+    "detail": "詳情",
+    "summaryLabel": "AI 工作摘要",
+    "feedbackLabel": "用戶回饋",
+    "projectDir": "專案目錄"
   }
 }

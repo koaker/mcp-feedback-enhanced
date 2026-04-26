@@ -2,34 +2,70 @@
   <div class="app-layout" :class="`app-layout--${layoutMode}`">
     <!-- Topbar -->
     <header class="app-layout__header">
-      <span class="app-layout__brand">MCP Feedback Enhanced</span>
-      <div class="app-layout__header-right">
-        <WsStatusBadge :status="wsStatus" />
+      <div class="app-layout__header-left">
         <button
-          class="app-layout__settings-btn"
-          :class="{ active: showSettings }"
-          @click="showSettings = !showSettings"
+          class="app-layout__icon-btn"
+          :class="{ active: activeDrawer === 'history' }"
+          @click="toggleDrawer('history')"
+          :title="i18n.t('history.title')"
+        >🕒</button>
+        <button
+          class="app-layout__icon-btn"
+          :class="{ active: activeDrawer === 'settings' }"
+          @click="toggleDrawer('settings')"
           :title="i18n.t('settings.title')"
         >⚙</button>
         <button
-          class="app-layout__reload-btn"
+          class="app-layout__icon-btn"
           @click="reloadPage"
           title="重新加载界面"
         >🔄</button>
       </div>
+      <span class="app-layout__brand">MCP Feedback Enhanced</span>
+      <div class="app-layout__header-right">
+        <WsStatusBadge :status="wsStatus" />
+      </div>
     </header>
 
-    <!-- Settings drawer -->
-    <transition name="drawer">
-      <div v-if="showSettings" class="app-layout__drawer">
-        <SettingsPanel />
-      </div>
-    </transition>
+    <!-- Settings top drawer -->
+    <!-- REMOVED - now using side drawer -->
 
     <!-- Main content -->
     <main class="app-layout__main">
       <slot />
     </main>
+
+    <!-- Settings side drawer overlay -->
+    <transition name="overlay">
+      <div
+        v-if="activeDrawer === 'settings'"
+        class="app-layout__side-overlay"
+        @click="closeDrawer"
+      />
+    </transition>
+
+    <!-- Settings side drawer -->
+    <transition name="side-drawer">
+      <div v-if="activeDrawer === 'settings'" class="app-layout__side-drawer">
+        <SettingsPanel @close="closeDrawer" />
+      </div>
+    </transition>
+
+    <!-- History side drawer overlay -->
+    <transition name="overlay">
+      <div
+        v-if="activeDrawer === 'history'"
+        class="app-layout__side-overlay"
+        @click="closeDrawer"
+      />
+    </transition>
+
+    <!-- History side drawer -->
+    <transition name="side-drawer">
+      <div v-if="activeDrawer === 'history'" class="app-layout__side-drawer">
+        <HistoryPanel @close="closeDrawer" />
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -37,6 +73,7 @@
 import { ref, computed } from 'vue'
 import WsStatusBadge from '../common/WsStatusBadge.vue'
 import SettingsPanel from '../settings/SettingsPanel.vue'
+import HistoryPanel from '../history/HistoryPanel.vue'
 import { useI18nStore } from '../../stores/i18n'
 import { useSettingsStore } from '../../stores/settings'
 import { useSessionStore } from '../../stores/session'
@@ -46,8 +83,16 @@ const i18n = useI18nStore()
 const settingsStore = useSettingsStore()
 const sessionStore = useSessionStore()
 const { wsStatus } = storeToRefs(sessionStore)
-const showSettings = ref(false)
+const activeDrawer = ref<'settings' | 'history' | null>(null)
 const layoutMode = computed(() => settingsStore.settings.layoutMode || 'combined-vertical')
+
+function toggleDrawer(panel: 'settings' | 'history') {
+  activeDrawer.value = activeDrawer.value === panel ? null : panel
+}
+
+function closeDrawer() {
+  activeDrawer.value = null
+}
 
 function reloadPage() {
   window.location.reload()
@@ -61,6 +106,7 @@ function reloadPage() {
   flex-direction: column;
   background: var(--bg-base);
   color: var(--text-primary);
+  position: relative;
 }
 
 .app-layout__header {
@@ -78,20 +124,34 @@ function reloadPage() {
   flex-shrink: 0;
 }
 
+.app-layout__header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
 .app-layout__brand {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--accent-text);
   letter-spacing: 0.02em;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .app-layout__header-right {
   display: flex;
   align-items: center;
   gap: 0.8rem;
+  flex: 1;
+  justify-content: flex-end;
 }
 
-.app-layout__settings-btn {
+.app-layout__icon-btn {
   background: none;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -105,17 +165,19 @@ function reloadPage() {
   justify-content: center;
   transition: color 0.2s, border-color 0.2s;
 }
-.app-layout__settings-btn:hover,
-.app-layout__settings-btn.active {
+.app-layout__icon-btn:hover,
+.app-layout__icon-btn.active {
   color: var(--accent-text);
   border-color: rgba(99, 102, 241, 0.4);
 }
 
+/* Settings top drawer (unchanged) */
 .app-layout__drawer {
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
   max-height: 400px;
   overflow-y: auto;
+  padding: 0 0 0.5rem;
 }
 
 .app-layout__main {
@@ -125,25 +187,41 @@ function reloadPage() {
   flex-direction: column;
 }
 
-.app-layout__reload-btn {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s, border-color 0.2s;
-}
-.app-layout__reload-btn:hover {
-  color: var(--accent-text);
-  border-color: rgba(99, 102, 241, 0.4);
+/* Side drawer overlay */
+.app-layout__side-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
 }
 
+/* Side drawer panel */
+.app-layout__side-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 201;
+  width: 320px;
+  max-width: 85vw;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Top drawer transitions */
 .drawer-enter-active, .drawer-leave-active { transition: max-height 0.25s ease, opacity 0.2s ease; }
 .drawer-enter-from, .drawer-leave-to { max-height: 0; opacity: 0; }
+
+/* Overlay transition */
+.overlay-enter-active, .overlay-leave-active { transition: opacity 0.2s ease; }
+.overlay-enter-from, .overlay-leave-to { opacity: 0; }
+
+/* Side drawer slide-in transition */
+.side-drawer-enter-active, .side-drawer-leave-active { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.side-drawer-enter-from, .side-drawer-leave-to { transform: translateX(-100%); }
 </style>

@@ -316,36 +316,21 @@ def create_feedback_text(feedback_data: dict) -> str:
                         img_base64 = None
 
                     if img_base64:
-                        # 只顯示前50個字符的預覽
-                        preview = (
-                            img_base64[:50] + "..."
-                            if len(img_base64) > 50
-                            else img_base64
-                        )
-                        img_info += f"\n     Base64 預覽: {preview}"
-                        img_info += f"\n     完整 Base64 長度: {len(img_base64)} 字符"
-
-                        # 如果 AI 助手不支援 MCP 圖片，可以提供完整 base64
                         debug_log(f"圖片 {i} Base64 已準備，長度: {len(img_base64)}")
 
-                        # 檢查是否啟用 Base64 詳細模式（從 UI 設定中獲取）
-                        include_full_base64 = feedback_data.get("settings", {}).get(
-                            "enable_base64_detail", False
-                        )
+                        # 根據檔案名推斷 MIME 類型
+                        file_name = img.get("name", "image.png")
+                        if file_name.lower().endswith((".jpg", ".jpeg")):
+                            mime_type = "image/jpeg"
+                        elif file_name.lower().endswith(".gif"):
+                            mime_type = "image/gif"
+                        elif file_name.lower().endswith(".webp"):
+                            mime_type = "image/webp"
+                        else:
+                            mime_type = "image/png"
 
-                        if include_full_base64:
-                            # 根據檔案名推斷 MIME 類型
-                            file_name = img.get("name", "image.png")
-                            if file_name.lower().endswith((".jpg", ".jpeg")):
-                                mime_type = "image/jpeg"
-                            elif file_name.lower().endswith(".gif"):
-                                mime_type = "image/gif"
-                            elif file_name.lower().endswith(".webp"):
-                                mime_type = "image/webp"
-                            else:
-                                mime_type = "image/png"
-
-                            img_info += f"\n     完整 Base64: data:{mime_type};base64,{img_base64}"
+                        # 始終嵌入完整 base64，確保 AI 能讀取圖片數據
+                        img_info += f"\n     完整 Base64: data:{mime_type};base64,{img_base64}"
 
                 except Exception as e:
                     debug_log(f"圖片 {i} Base64 處理失敗: {e}")
@@ -354,7 +339,7 @@ def create_feedback_text(feedback_data: dict) -> str:
 
         # 添加兼容性說明
         text_parts.append(
-            "\n💡 注意：如果 AI 助手無法顯示圖片，圖片數據已包含在上述 Base64 信息中。"
+            "\n💡 圖片數據已以 data URI 格式嵌入上方，AI 可直接讀取。"
         )
 
     return "\n\n".join(text_parts) if text_parts else "用戶未提供任何回饋內容。"

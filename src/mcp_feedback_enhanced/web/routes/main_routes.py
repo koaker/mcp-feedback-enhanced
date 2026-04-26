@@ -197,6 +197,8 @@ def setup_routes(manager: "WebUIManager"):
                     "session_id": session.session_id,
                     "project_directory": session.project_directory,
                     "summary": session.summary,
+                    "feedback": session.feedback_result or "",
+                    "images_count": len(session.images) if session.images else 0,
                     "status": session.status.value,
                     "status_message": session.status_message,
                     "created_at": int(session.created_at * 1000),  # 轉換為毫秒
@@ -443,96 +445,98 @@ def setup_routes(manager: "WebUIManager"):
                 },
             )
 
+    @manager.app.get("/api/process-session-id")
+    async def get_process_session_id(request: Request):
+        """返回當前進程的唯一會話組 ID"""
+        return JSONResponse(content={
+            "process_session_id": manager.process_session_id,
+            "started_at": manager.process_started_at,
+        })
+
+    @manager.app.get("/api/in-memory-history")
+    async def get_in_memory_history(request: Request):
+        """返回當前進程內存中的所有 session 記錄"""
+        try:
+            records = []
+            for sid, session in manager.sessions.items():
+                from ..models import SessionStatus
+                records.append({
+                    "session_id": sid,
+                    "project_directory": session.project_directory,
+                    "summary": session.summary,
+                    "feedback": session.feedback_result or "",
+                    "images_count": len(session.images) if session.images else 0,
+                    "created_at": session.created_at if session.created_at else 0,
+                    "status": session.status.value,
+                    "is_active": session.status in (SessionStatus.WAITING, SessionStatus.ACTIVE),
+                })
+            # 按建立時間正序
+            records.sort(key=lambda r: r["created_at"] or 0)
+            return JSONResponse(content={
+                "process_session_id": manager.process_session_id,
+                "started_at": manager.process_started_at,
+                "sessions": records,
+            })
+        except Exception as e:
+            debug_log(f"獲取內存歷史失敗: {e}")
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
     @manager.app.get("/api/load-session-history")
     async def load_session_history(request: Request):
-        """從檔案載入會話歷史"""
-
+        """從磁碟載入所有進程的會話歷史（按時間倒序）"""
         try:
-            # 使用統一的設定檔案路徑
-            config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
-            history_file = config_dir / "session_history.json"
-
-            if history_file.exists():
-                with open(history_file, encoding="utf-8") as f:
-                    history_data = json.load(f)
-
-                debug_log(f"會話歷史已從檔案載入: {history_file}")
-
-                # 確保資料格式相容性
-                if isinstance(history_data, dict):
-                    # 新格式：包含版本資訊和其他元資料
-                    sessions = history_data.get("sessions", [])
-                    last_cleanup = history_data.get("lastCleanup", 0)
-                else:
-                    # 舊格式：直接是會話陣列（向後相容）
-                    sessions = history_data if isinstance(history_data, list) else []
-                    last_cleanup = 0
-
-                # 回傳會話歷史資料
-                return JSONResponse(
-                    content={"sessions": sessions, "lastCleanup": last_cleanup}
-                )
-
-            debug_log("會話歷史檔案不存在，返回空歷史")
-            return JSONResponse(content={"sessions": [], "lastCleanup": 0})
-
+            history_dir = Path.home() / ".config" / "mcp-feedback-enhanced" / "history"
+            groups = []
+            if history_dir.exists():
+                for f in sorted(history_dir.glob("session_*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+                    try:
+                        with open(f, encoding="utf-8") as fp:
+                            data = json.load(fp)
+                        groups.append(data)
+                    except Exception as e:
+                        debug_log(f"讀取歷史文件 {f} 失敗: {e}")
+            return JSONResponse(content={
+                "process_session_id": manager.process_session_id,
+                "groups": groups,
+            })
         except Exception as e:
             debug_log(f"載入會話歷史失敗: {e}")
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error",
-                    "message": f"Load failed: {e!s}",
-                    "messageCode": get_msg_code("load_failed"),
-                },
-            )
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
     @manager.app.post("/api/save-session-history")
     async def save_session_history(request: Request):
-        """保存會話歷史到檔案"""
-
+        """保存當前進程的會話歷史到獨立文件"""
         try:
             data = await request.json()
+            history_dir = Path.home() / ".config" / "mcp-feedback-enhanced" / "history"
+            history_dir.mkdir(parents=True, exist_ok=True)
 
-            # 使用統一的設定檔案路徑
-            config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
-            config_dir.mkdir(parents=True, exist_ok=True)
-            history_file = config_dir / "session_history.json"
+            group_id = data.get("group_id", manager.process_session_id)
+            history_file = history_dir / f"session_{group_id}.json"
 
-            # 建立新格式的資料結構
             history_data = {
-                "version": "1.0",
+                "group_id": group_id,
+                "started_at": data.get("started_at", manager.process_started_at),
                 "sessions": data.get("sessions", []),
-                "lastCleanup": data.get("lastCleanup", 0),
-                "savedAt": int(time.time() * 1000),  # 當前時間戳
+                "saved_at": time.time(),
             }
-
-            # 保存會話歷史到檔案
             with open(history_file, "w", encoding="utf-8") as f:
                 json.dump(history_data, f, ensure_ascii=False, indent=2)
 
-            debug_log(f"會話歷史已保存到: {history_file}")
-            session_count = len(history_data["sessions"])
-            debug_log(f"保存了 {session_count} 個會話記錄")
+            # 自動清理：只保留最近 10 個會話組文件
+            all_files = sorted(history_dir.glob("session_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for old_file in all_files[10:]:
+                try:
+                    old_file.unlink()
+                    debug_log(f"自動清理舊歷史文件: {old_file.name}")
+                except Exception:
+                    pass
 
-            return JSONResponse(
-                content={
-                    "status": "success",
-                    "messageCode": get_msg_code("session_history_saved"),
-                    "params": {"count": session_count},
-                }
-            )
-
+            debug_log(f"會話歷史已保存: {history_file}")
+            return JSONResponse(content={"status": "success", "group_id": group_id})
         except Exception as e:
             debug_log(f"保存會話歷史失敗: {e}")
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error",
-                    "message": f"Save failed: {e!s}",
-                    "messageCode": get_msg_code("save_failed"),
-                },
-            )
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
     @manager.app.get("/api/log-level")
     async def get_log_level(request: Request):
@@ -645,6 +649,61 @@ def setup_routes(manager: "WebUIManager"):
         )
 
 
+def _auto_save_session_to_history(manager: "WebUIManager", session) -> None:
+    """將 session 紀錄追加/更新到磁碟歷史文件"""
+    try:
+        from ..models import SessionStatus
+        history_dir = Path.home() / ".config" / "mcp-feedback-enhanced" / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        group_id = manager.process_session_id
+        history_file = history_dir / f"session_{group_id}.json"
+
+        # 讀取現有文件（如果存在）
+        if history_file.exists():
+            with open(history_file, encoding="utf-8") as f:
+                group_data = json.load(f)
+        else:
+            group_data = {
+                "group_id": group_id,
+                "started_at": manager.process_started_at,
+                "sessions": [],
+            }
+
+        # 構建 session 紀錄
+        record = {
+            "session_id": session.session_id,
+            "project_directory": session.project_directory,
+            "summary": session.summary,
+            "feedback": session.feedback_result or "",
+            "images_count": len(session.images) if session.images else 0,
+            "created_at": session.created_at if session.created_at else 0,
+            "status": session.status.value,
+        }
+
+        # 更新或追加（避免重複）
+        existing_ids = [s["session_id"] for s in group_data["sessions"]]
+        if session.session_id in existing_ids:
+            idx = existing_ids.index(session.session_id)
+            group_data["sessions"][idx] = record
+        else:
+            group_data["sessions"].append(record)
+
+        with open(history_file, "w", encoding="utf-8") as f:
+            json.dump(group_data, f, ensure_ascii=False, indent=2)
+
+        # 最多保留 10 個文件
+        all_files = sorted(history_dir.glob("session_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for old_file in all_files[10:]:
+            try:
+                old_file.unlink()
+            except Exception:
+                pass
+
+        debug_log(f"歷史記錄已自動保存: {history_file}")
+    except Exception as e:
+        debug_log(f"自動保存歷史失敗: {e}")
+
+
 async def handle_websocket_message(manager: "WebUIManager", session, data: dict):
     """處理 WebSocket 消息"""
     message_type = data.get("type")
@@ -655,6 +714,8 @@ async def handle_websocket_message(manager: "WebUIManager", session, data: dict)
         images = data.get("images", [])
         settings = data.get("settings", {})
         await session.submit_feedback(feedback, images, settings)
+        # 提交後自動持久化到磁碟歷史
+        _auto_save_session_to_history(manager, session)
 
     elif message_type == "run_command":
         # 執行命令

@@ -678,5 +678,19 @@
   "waiting": {
     "title": "等待 AI 工作中",
     "desc": "请稍候，AI 正在处理任务..."
+  },
+  "history": {
+    "title": "历史记录",
+    "refresh": "刷新",
+    "loading": "加载中...",
+    "empty": "暂无历史记录",
+    "noRecords": "本组无记录",
+    "currentSession": "本次会话",
+    "items": "条",
+    "inProgress": "进行中",
+    "detail": "详情",
+    "summaryLabel": "AI 工作摘要",
+    "feedbackLabel": "用户回馈",
+    "projectDir": "项目目录"
   }
 }
