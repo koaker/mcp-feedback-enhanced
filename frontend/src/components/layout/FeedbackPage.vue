@@ -5,7 +5,7 @@
       <SummaryPanel :summary="summary" :project-directory="projectDirectory" />
     </div>
 
-    <!-- Right/Bottom: Feedback + Command -->
+    <!-- Right/Bottom: Feedback only -->
     <div class="feedback-page__right">
       <div class="feedback-page__form">
         <FeedbackForm v-if="!feedbackCompleted" />
@@ -13,9 +13,6 @@
           <div class="feedback-page__done-icon">✓</div>
           <p>{{ i18n.t('feedback.alreadySubmitted') }}</p>
         </div>
-      </div>
-      <div class="feedback-page__cmd">
-        <CommandRunner />
       </div>
     </div>
   </div>
@@ -25,7 +22,6 @@
 import { computed } from 'vue'
 import SummaryPanel from '../session/SummaryPanel.vue'
 import FeedbackForm from '../feedback/FeedbackForm.vue'
-import CommandRunner from '../feedback/CommandRunner.vue'
 import { useSessionStore } from '../../stores/session'
 import { useSettingsStore } from '../../stores/settings'
 import { useI18nStore } from '../../stores/i18n'
@@ -88,7 +84,6 @@ const layoutMode = computed(() => settingsStore.settings.layoutMode || 'combined
 }
 
 .feedback-page__form { flex: 0 0 auto; }
-.feedback-page__cmd  { flex: 1; min-height: 0; overflow: hidden; }
 
 .feedback-page__done {
   display: flex;

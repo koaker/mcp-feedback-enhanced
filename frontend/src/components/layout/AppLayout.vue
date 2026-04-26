@@ -17,6 +17,18 @@
         >⚙</button>
         <button
           class="app-layout__icon-btn"
+          :class="{ active: activeDrawer === 'logs' }"
+          @click="toggleDrawer('logs')"
+          title="日志"
+        >📋</button>
+        <button
+          class="app-layout__icon-btn"
+          :class="{ active: activeDrawer === 'terminal' }"
+          @click="toggleDrawer('terminal')"
+          title="命令执行"
+        >⌨</button>
+        <button
+          class="app-layout__icon-btn"
           @click="reloadPage"
           title="重新加载界面"
         >🔄</button>
@@ -66,6 +78,50 @@
         <HistoryPanel @close="closeDrawer" />
       </div>
     </transition>
+
+    <!-- Logs side drawer overlay -->
+    <transition name="overlay">
+      <div
+        v-if="activeDrawer === 'logs'"
+        class="app-layout__side-overlay"
+        @click="closeDrawer"
+      />
+    </transition>
+
+    <!-- Logs side drawer -->
+    <transition name="side-drawer">
+      <div
+        v-if="activeDrawer === 'logs'"
+        class="app-layout__side-drawer"
+        :style="{ width: drawerWidth + 'px' }"
+      >
+        <LogPanel @close="closeDrawer" />
+        <!-- Drag handle -->
+        <div class="app-layout__resize-handle" @mousedown="startResize" />
+      </div>
+    </transition>
+
+    <!-- Terminal side drawer overlay -->
+    <transition name="overlay">
+      <div
+        v-if="activeDrawer === 'terminal'"
+        class="app-layout__side-overlay"
+        @click="closeDrawer"
+      />
+    </transition>
+
+    <!-- Terminal side drawer -->
+    <transition name="side-drawer">
+      <div v-if="activeDrawer === 'terminal'" class="app-layout__side-drawer">
+        <div class="app-layout__side-panel-header">
+          <span class="app-layout__side-panel-title">命令执行</span>
+          <button class="app-layout__side-panel-close" @click="closeDrawer">✕</button>
+        </div>
+        <div class="app-layout__side-panel-body">
+          <CommandRunner />
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -74,6 +130,8 @@ import { ref, computed } from 'vue'
 import WsStatusBadge from '../common/WsStatusBadge.vue'
 import SettingsPanel from '../settings/SettingsPanel.vue'
 import HistoryPanel from '../history/HistoryPanel.vue'
+import LogPanel from '../logs/LogPanel.vue'
+import CommandRunner from '../feedback/CommandRunner.vue'
 import { useI18nStore } from '../../stores/i18n'
 import { useSettingsStore } from '../../stores/settings'
 import { useSessionStore } from '../../stores/session'
@@ -83,10 +141,11 @@ const i18n = useI18nStore()
 const settingsStore = useSettingsStore()
 const sessionStore = useSessionStore()
 const { wsStatus } = storeToRefs(sessionStore)
-const activeDrawer = ref<'settings' | 'history' | null>(null)
+const activeDrawer = ref<'settings' | 'history' | 'logs' | 'terminal' | null>(null)
 const layoutMode = computed(() => settingsStore.settings.layoutMode || 'combined-vertical')
+const drawerWidth = ref(480)
 
-function toggleDrawer(panel: 'settings' | 'history') {
+function toggleDrawer(panel: 'settings' | 'history' | 'logs' | 'terminal') {
   activeDrawer.value = activeDrawer.value === panel ? null : panel
 }
 
@@ -96,6 +155,26 @@ function closeDrawer() {
 
 function reloadPage() {
   window.location.reload()
+}
+
+function startResize(e: MouseEvent) {
+  e.preventDefault()
+  const startX = e.clientX
+  const startW = drawerWidth.value
+
+  function onMove(ev: MouseEvent) {
+    const delta = ev.clientX - startX
+    const newW = Math.min(Math.max(startW + delta, 280), window.innerWidth * 0.9)
+    drawerWidth.value = newW
+  }
+
+  function onUp() {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
 }
 </script>
 
@@ -203,14 +282,30 @@ function reloadPage() {
   left: 0;
   bottom: 0;
   z-index: 201;
-  width: 320px;
-  max-width: 85vw;
+  width: 480px;
+  max-width: 90vw;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Drag resize handle */
+.app-layout__resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  bottom: 0;
+  cursor: col-resize;
+  z-index: 10;
+}
+.app-layout__resize-handle:hover,
+.app-layout__resize-handle:active {
+  background: var(--accent-text);
+  opacity: 0.3;
 }
 
 /* Top drawer transitions */
@@ -224,4 +319,40 @@ function reloadPage() {
 /* Side drawer slide-in transition */
 .side-drawer-enter-active, .side-drawer-leave-active { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
 .side-drawer-enter-from, .side-drawer-leave-to { transform: translateX(-100%); }
+
+/* Terminal drawer is wider */
+.app-layout__side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.2rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.app-layout__side-panel-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.app-layout__side-panel-close {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 1rem;
+  padding: 0 0.4rem;
+  cursor: pointer;
+  line-height: 1.6;
+}
+.app-layout__side-panel-close:hover { color: var(--text-primary); }
+
+.app-layout__side-panel-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+}
 </style>

@@ -24,6 +24,7 @@ from typing import Any
 from fastapi import WebSocket
 
 from ...debug import web_debug_log as debug_log
+from ...debug import info_log
 from ...utils.error_handler import ErrorHandler, ErrorType
 from ...utils.resource_manager import get_resource_manager, register_process
 from ..constants import get_message_code
@@ -534,6 +535,7 @@ class WebFeedbackSession:
         # 先設置設定，再處理圖片（因為處理圖片時需要用到設定）
         self.settings = settings or {}
         self.images = self._process_images(images)
+        info_log(f"反馈已提交: session {self.session_id[:8]}... 图片数: {len(self.images)}", "FEEDBACK")
 
         # 進入下一步：等待中 → 已提交反饋
         self.next_step("已送出反饋，等待下次 MCP 調用")

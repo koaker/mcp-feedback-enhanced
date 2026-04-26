@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ... import __version__
 from ...debug import web_debug_log as debug_log
+from ...debug import get_log_buffer, clear_log_buffer
 from ..constants import get_message_code as get_msg_code
 
 
@@ -647,6 +648,26 @@ def setup_routes(manager: "WebUIManager"):
                 "messageCode": "server.restarting",
             }
         )
+
+    @manager.app.get("/api/logs")
+    async def get_logs(request: Request):
+        """获取内存日志缓冲区（最近 N 条）"""
+        try:
+            tail_str = request.query_params.get("tail", "200")
+            tail = int(tail_str)
+            entries = get_log_buffer(tail=tail)
+            return JSONResponse(content={"logs": entries, "total": len(entries)})
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
+    @manager.app.delete("/api/logs")
+    async def clear_logs(request: Request):
+        """清空内存日志缓冲区"""
+        try:
+            clear_log_buffer()
+            return JSONResponse(content={"status": "ok"})
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 def _auto_save_session_to_history(manager: "WebUIManager", session) -> None:

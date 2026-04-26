@@ -22,7 +22,34 @@ debug_log("這是一條調試信息")
 
 import os
 import sys
+import time
+from collections import deque
 from typing import Any
+
+
+# 内存日志缓冲区（最多保留 500 条）
+_log_buffer: deque = deque(maxlen=500)
+
+
+def _record_log(level: str, prefix: str, message: str) -> None:
+    """将日志写入内存缓冲区"""
+    _log_buffer.append({
+        "ts": time.time(),
+        "level": level,
+        "prefix": prefix,
+        "message": message,
+    })
+
+
+def get_log_buffer(tail: int = 100) -> list:
+    """返回最近 tail 条日志记录"""
+    entries = list(_log_buffer)
+    return entries[-tail:] if tail < len(entries) else entries
+
+
+def clear_log_buffer() -> None:
+    """清空日志缓冲区"""
+    _log_buffer.clear()
 
 
 def debug_log(message: Any, prefix: str = "DEBUG") -> None:
@@ -33,14 +60,17 @@ def debug_log(message: Any, prefix: str = "DEBUG") -> None:
         message: 要輸出的調試信息
         prefix: 調試信息的前綴標識，默認為 "DEBUG"
     """
-    # 只在啟用調試模式時才輸出，避免干擾 MCP 通信
-    if os.getenv("MCP_DEBUG", "").lower() not in ("true", "1", "yes", "on"):
-        return
-
     try:
         # 確保消息是字符串類型
         if not isinstance(message, str):
             message = str(message)
+
+        # 始终记录到内存缓冲区
+        _record_log("DEBUG", prefix, message)
+
+        # 只在啟用調試模式時才輸出到 stderr，避免干擾 MCP 通信
+        if os.getenv("MCP_DEBUG", "").lower() not in ("true", "1", "yes", "on"):
+            return
 
         # 安全地輸出到 stderr，處理編碼問題
         try:
@@ -51,6 +81,37 @@ def debug_log(message: Any, prefix: str = "DEBUG") -> None:
             print(f"[{prefix}] {safe_message}", file=sys.stderr, flush=True)
     except Exception:
         # 最後的備用方案：靜默失敗，不影響主程序
+        pass
+
+
+def info_log(message: Any, prefix: str = "INFO") -> None:
+    """记录 INFO 级别日志（始终写入缓冲区）"""
+    try:
+        if not isinstance(message, str):
+            message = str(message)
+        _record_log("INFO", prefix, message)
+    except Exception:
+        pass
+
+
+def warn_log(message: Any, prefix: str = "WARN") -> None:
+    """记录 WARN 级别日志（始终写入缓冲区）"""
+    try:
+        if not isinstance(message, str):
+            message = str(message)
+        _record_log("WARN", prefix, message)
+    except Exception:
+        pass
+
+
+def error_log(message: Any, prefix: str = "ERROR") -> None:
+    """记录 ERROR 级别日志（始终写入缓冲区并输出到 stderr）"""
+    try:
+        if not isinstance(message, str):
+            message = str(message)
+        _record_log("ERROR", prefix, message)
+        print(f"[{prefix}] {message}", file=sys.stderr, flush=True)
+    except Exception:
         pass
 
 

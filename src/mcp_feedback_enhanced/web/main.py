@@ -24,6 +24,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..debug import web_debug_log as debug_log
+from ..debug import info_log, warn_log, error_log
 from ..utils.error_handler import ErrorHandler, ErrorType
 from ..utils.memory_monitor import get_memory_monitor
 from .models import CleanupReason, SessionStatus, WebFeedbackSession
@@ -411,6 +412,7 @@ class WebUIManager:
         self.sessions[session_id] = session
 
         debug_log(f"創建新的活躍會話: {session_id}")
+        info_log(f"新会话创建: {session_id[:8]}... 项目: {project_directory}", "SESSION")
         debug_log(f"繼承 {len(session.active_tabs)} 個活躍標籤頁")
 
         # 處理WebSocket連接轉移
@@ -587,6 +589,9 @@ class WebUIManager:
                         debug_log(
                             f"✅ 服務器成功啟動在替代端口 {self.port} (原端口 {original_port} 被佔用)"
                         )
+                        info_log(f"Web 服务器已启动（替代端口）: http://{self.host}:{self.port}", "SERVER")
+                    else:
+                        info_log(f"Web 服务器已启动: http://{self.host}:{self.port}", "SERVER")
 
                     break
 

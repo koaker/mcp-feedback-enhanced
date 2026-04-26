@@ -2,8 +2,10 @@
 __pycache__/
 *.py[oc]
 build/
-dist/
+/dist/
 wheels/
+# Exempt compiled web UI assets (needed for uvx/pip install users)
+!src/mcp_feedback_enhanced/web/static/dist/
 *.egg-info
 
 # Development tool caches
