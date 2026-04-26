@@ -32,7 +32,7 @@ from typing import Annotated, Any
 
 from fastmcp import FastMCP
 from fastmcp.utilities.types import Image as MCPImage
-from mcp.types import TextContent
+from mcp.types import TextContent, CallToolResult, ImageContent
 from pydantic import Field
 
 # 導入統一的調試功能
@@ -360,15 +360,15 @@ def create_feedback_text(feedback_data: dict) -> str:
     return "\n\n".join(text_parts) if text_parts else "用戶未提供任何回饋內容。"
 
 
-def process_images(images_data: list[dict]) -> list[MCPImage]:
+def process_images(images_data: list[dict]) -> list[ImageContent]:
     """
-    處理圖片資料，轉換為 MCP 圖片對象
+    處理圖片資料，轉換為 MCP ImageContent 對象
 
     Args:
         images_data: 圖片資料列表
 
     Returns:
-        List[MCPImage]: MCP 圖片對象列表
+        List[ImageContent]: MCP 圖片內容對象列表
     """
     mcp_images = []
 
@@ -378,39 +378,37 @@ def process_images(images_data: list[dict]) -> list[MCPImage]:
                 debug_log(f"圖片 {i} 沒有資料，跳過")
                 continue
 
-            # 檢查數據類型並相應處理
+            # 統一轉換為 base64 字符串（ImageContent.data 要求 base64 str）
             if isinstance(img["data"], bytes):
-                # 如果是原始 bytes 數據，直接使用
-                image_bytes = img["data"]
-                debug_log(
-                    f"圖片 {i} 使用原始 bytes 數據，大小: {len(image_bytes)} bytes"
-                )
+                image_b64 = base64.b64encode(img["data"]).decode("utf-8")
+                debug_log(f"圖片 {i} bytes 轉 base64，大小: {len(img['data'])} bytes")
             elif isinstance(img["data"], str):
-                # 如果是 base64 字符串，進行解碼
-                image_bytes = base64.b64decode(img["data"])
-                debug_log(f"圖片 {i} 從 base64 解碼，大小: {len(image_bytes)} bytes")
+                image_b64 = img["data"]
+                debug_log(f"圖片 {i} 已是 base64 字符串")
             else:
                 debug_log(f"圖片 {i} 數據類型不支援: {type(img['data'])}")
                 continue
 
-            if len(image_bytes) == 0:
+            if not image_b64:
                 debug_log(f"圖片 {i} 數據為空，跳過")
                 continue
 
-            # 根據文件名推斷格式
+            # 根據文件名推斷 MIME 類型
             file_name = img.get("name", "image.png")
             if file_name.lower().endswith((".jpg", ".jpeg")):
-                image_format = "jpeg"
+                mime_type = "image/jpeg"
             elif file_name.lower().endswith(".gif"):
-                image_format = "gif"
+                mime_type = "image/gif"
+            elif file_name.lower().endswith(".webp"):
+                mime_type = "image/webp"
             else:
-                image_format = "png"  # 默認使用 PNG
+                mime_type = "image/png"
 
-            # 創建 MCPImage 對象
-            mcp_image = MCPImage(data=image_bytes, format=image_format)
+            # 創建標準 MCP ImageContent 對象
+            mcp_image = ImageContent(type="image", data=image_b64, mimeType=mime_type)
             mcp_images.append(mcp_image)
 
-            debug_log(f"圖片 {i} ({file_name}) 處理成功，格式: {image_format}")
+            debug_log(f"圖片 {i} ({file_name}) 處理成功，MIME: {mime_type}")
 
         except Exception as e:
             # 使用統一錯誤處理（不影響 JSON RPC）
@@ -433,7 +431,7 @@ async def interactive_feedback(
         str, Field(description="AI 工作完成的摘要說明")
     ] = "我已完成了您請求的任務。",
     timeout: Annotated[int, Field(description="等待用戶回饋的超時時間（秒）")] = 86400,
-) -> list:
+) -> CallToolResult:
     """Interactive feedback collection tool for LLM agents.
 
     USAGE RULES:
@@ -471,7 +469,7 @@ async def interactive_feedback(
 
         # 處理取消情況
         if not result:
-            return [TextContent(type="text", text="用戶取消了回饋。")]
+            return CallToolResult(content=[TextContent(type="text", text="用戶取消了回饋。")])
 
         # 儲存詳細結果
         save_feedback_to_file(result)
@@ -503,7 +501,7 @@ async def interactive_feedback(
             )
 
         debug_log(f"回饋收集完成，共 {len(feedback_items)} 個項目")
-        return feedback_items
+        return CallToolResult(content=feedback_items)
 
     except Exception as e:
         # 使用統一錯誤處理，但不影響 JSON RPC 響應
@@ -517,7 +515,7 @@ async def interactive_feedback(
         user_error_msg = ErrorHandler.format_user_error(e, include_technical=False)
         debug_log(f"回饋收集錯誤 [錯誤ID: {error_id}]: {e!s}")
 
-        return [TextContent(type="text", text=user_error_msg)]
+        return CallToolResult(content=[TextContent(type="text", text=user_error_msg)])
 
 
 async def launch_web_feedback_ui(project_dir: str, summary: str, timeout: int) -> dict:

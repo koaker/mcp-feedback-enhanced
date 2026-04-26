@@ -10,6 +10,7 @@
         @keydown.ctrl.enter="submit"
         @keydown.meta.enter="submit"
         @input="resetAutoSubmit"
+        @paste="onPaste"
         :disabled="submitted"
       />
     </div>
@@ -40,21 +41,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import ImageUpload from './ImageUpload.vue'
 import type { ImageItem } from '../../types/session'
 import { useI18nStore } from '../../stores/i18n'
 import { useSettingsStore } from '../../stores/settings'
+import { useSessionStore } from '../../stores/session'
 import { wsManager } from '../../api/websocket'
 import { useAutoSubmit } from '../../composables/useTimer'
+import { storeToRefs } from 'pinia'
 
 const i18n = useI18nStore()
 const settingsStore = useSettingsStore()
+const sessionStore = useSessionStore()
+const { sessionId } = storeToRefs(sessionStore)
 
 const text = ref('')
 const images = ref<ImageItem[]>([])
 const submitting = ref(false)
 const submitted = ref(false)
+
+// 新 session 到来时重置表单，解除输入框锁定
+watch(sessionId, (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    text.value = ''
+    images.value = []
+    submitting.value = false
+    submitted.value = false
+    if (autoSubmitEnabled.value) startAutoSubmit()
+  }
+})
 
 const autoSubmitEnabled = computed(() => settingsStore.settings.autoSubmitEnabled ?? false)
 const autoSubmitLabel = computed(() => i18n.t('feedback.autoSubmit').replace('{seconds}', String(remaining.value)))
@@ -69,6 +85,34 @@ onUnmounted(() => stopAutoSubmit())
 
 function cancelAutoSubmit() {
   stopAutoSubmit()
+}
+
+// Paste image from clipboard (Ctrl+V)
+async function onPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  const imageFiles: File[] = []
+  for (const item of Array.from(items)) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) imageFiles.push(file)
+    }
+  }
+  if (imageFiles.length === 0) return
+  e.preventDefault()
+  const limit = settingsStore.settings.image_size_limit ?? 1048576
+  const results: ImageItem[] = []
+  for (const file of imageFiles) {
+    if (file.size > limit) continue
+    const data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve((reader.result as string).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    results.push({ name: file.name || `paste-${Date.now()}.png`, data, size: file.size })
+  }
+  if (results.length) images.value = [...images.value, ...results]
 }
 
 async function submit() {
