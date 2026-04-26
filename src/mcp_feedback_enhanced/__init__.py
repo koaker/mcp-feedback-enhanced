@@ -17,11 +17,37 @@ MCP Interactive Feedback Enhanced
 - 重構的模組化架構
 """
 
-__version__ = "2.6.0"
+import os
+import subprocess
+from pathlib import Path
+
+# 基礎版本號
+__base_version__ = "2.6.0"
 __author__ = "Minidoracat"
 __email__ = "minidora0702@gmail.com"
 
-import os
+
+def _get_git_hash() -> str:
+    """在运行時获取当前 git commit 短哈希，失败时返回空字符串"""
+    try:
+        # 定位包根目錄（当前文件所在目录的父目录）
+        pkg_dir = Path(__file__).resolve().parent.parent
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=pkg_dir,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return ""
+
+
+_git_hash = _get_git_hash()
+__version__ = f"{__base_version__}+{_git_hash}" if _git_hash else __base_version__
 
 from .server import main as run_server
 

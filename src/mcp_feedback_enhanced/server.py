@@ -550,6 +550,7 @@ def get_system_info() -> str:
     system_info = {
         "平台": sys.platform,
         "Python 版本": sys.version.split()[0],
+        "伺服器版本": __version__,
         "WSL 環境": is_wsl,
         "遠端環境": is_remote,
         "介面類型": "Web UI",
