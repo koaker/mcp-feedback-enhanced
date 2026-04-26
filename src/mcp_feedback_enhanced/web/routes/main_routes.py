@@ -669,6 +669,12 @@ def setup_routes(manager: "WebUIManager"):
         except Exception as e:
             return JSONResponse(status_code=500, content={"error": str(e)})
 
+    @manager.app.get("/api/version")
+    async def get_version(request: Request):
+        """获取伺服器版本号（含 git + 源码内容哈希）"""
+        from ... import __version__
+        return JSONResponse(content={"version": __version__})
+
     @manager.app.delete("/api/logs")
     async def clear_logs(request: Request):
         """清空内存日志缓冲区"""

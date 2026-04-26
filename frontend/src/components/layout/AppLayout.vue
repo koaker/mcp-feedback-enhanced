@@ -27,7 +27,7 @@
           title="重新加载界面"
         >🔄</button>
       </div>
-      <span class="app-layout__brand">MCP Feedback Enhanced</span>
+      <span class="app-layout__brand">MCP Feedback Enhanced <span v-if="version" class="app-layout__version">{{ version }}</span></span>
       <div class="app-layout__header-right">
         <WsStatusBadge :status="wsStatus" />
       </div>
@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import WsStatusBadge from '../common/WsStatusBadge.vue'
 import SettingsPanel from '../settings/SettingsPanel.vue'
 import HistoryPanel from '../history/HistoryPanel.vue'
@@ -115,6 +115,17 @@ const { wsStatus } = storeToRefs(sessionStore)
 const activeDrawer = ref<'settings' | 'history' | 'logs' | null>(null)
 const layoutMode = computed(() => settingsStore.settings.layoutMode || 'combined-vertical')
 const drawerWidth = ref(480)
+const version = ref('')
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/version')
+    const data = await res.json()
+    version.value = data.version || ''
+  } catch {
+    // version API not available
+  }
+})
 
 function toggleDrawer(panel: 'settings' | 'history' | 'logs') {
   activeDrawer.value = activeDrawer.value === panel ? null : panel
@@ -191,6 +202,14 @@ function startResize(e: MouseEvent) {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
+}
+
+.app-layout__version {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.55;
+  margin-left: 0.35rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
 
 .app-layout__header-right {
