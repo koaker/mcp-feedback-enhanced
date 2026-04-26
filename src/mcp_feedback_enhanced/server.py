@@ -280,10 +280,6 @@ def create_feedback_text(feedback_data: dict) -> str:
     if feedback_data.get("interactive_feedback"):
         text_parts.append(f"=== 用戶回饋 ===\n{feedback_data['interactive_feedback']}")
 
-    # 命令執行日誌
-    if feedback_data.get("command_logs"):
-        text_parts.append(f"=== 命令執行日誌 ===\n{feedback_data['command_logs']}")
-
     # 圖片附件概要
     if feedback_data.get("images"):
         images = feedback_data["images"]
@@ -465,7 +461,6 @@ async def interactive_feedback(
         # 添加文字回饋
         if (
             result.get("interactive_feedback")
-            or result.get("command_logs")
             or result.get("images")
         ):
             feedback_text = create_feedback_text(result)
@@ -536,7 +531,6 @@ async def launch_web_feedback_ui(project_dir: str, summary: str, timeout: int) -
         debug_log(f"Web UI 模組導入失敗 [錯誤ID: {error_id}]: {e}")
 
         return {
-            "command_logs": "",
             "interactive_feedback": user_error_msg,
             "images": [],
         }

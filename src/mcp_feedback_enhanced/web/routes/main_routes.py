@@ -24,11 +24,21 @@ if TYPE_CHECKING:
     from ..main import WebUIManager
 
 
+HISTORY_MAX_FILES = 10
+
+
+def get_config_dir() -> Path:
+    """獲取統一的設定檔案目錄"""
+    config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
+
+
 def load_user_layout_settings() -> str:
     """載入用戶的佈局模式設定"""
     try:
         # 使用統一的設定檔案路徑
-        config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
+        config_dir = get_config_dir()
         settings_file = config_dir / "ui_settings.json"
 
         if settings_file.exists():
@@ -355,7 +365,7 @@ def setup_routes(manager: "WebUIManager"):
             data = await request.json()
 
             # 使用統一的設定檔案路徑
-            config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
+            config_dir = get_config_dir()
             config_dir.mkdir(parents=True, exist_ok=True)
             settings_file = config_dir / "ui_settings.json"
 
@@ -389,7 +399,7 @@ def setup_routes(manager: "WebUIManager"):
 
         try:
             # 使用統一的設定檔案路徑
-            config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
+            config_dir = get_config_dir()
             settings_file = config_dir / "ui_settings.json"
 
             if settings_file.exists():
@@ -418,7 +428,7 @@ def setup_routes(manager: "WebUIManager"):
 
         try:
             # 使用統一的設定檔案路徑
-            config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
+            config_dir = get_config_dir()
             settings_file = config_dir / "ui_settings.json"
 
             if settings_file.exists():
@@ -485,7 +495,7 @@ def setup_routes(manager: "WebUIManager"):
     async def load_session_history(request: Request):
         """從磁碟載入所有進程的會話歷史（按時間倒序）"""
         try:
-            history_dir = Path.home() / ".config" / "mcp-feedback-enhanced" / "history"
+            history_dir = get_config_dir() / "history"
             groups = []
             if history_dir.exists():
                 for f in sorted(history_dir.glob("session_*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
@@ -508,7 +518,7 @@ def setup_routes(manager: "WebUIManager"):
         """保存當前進程的會話歷史到獨立文件"""
         try:
             data = await request.json()
-            history_dir = Path.home() / ".config" / "mcp-feedback-enhanced" / "history"
+            history_dir = get_config_dir() / "history"
             history_dir.mkdir(parents=True, exist_ok=True)
 
             group_id = data.get("group_id", manager.process_session_id)
@@ -525,7 +535,7 @@ def setup_routes(manager: "WebUIManager"):
 
             # 自動清理：只保留最近 10 個會話組文件
             all_files = sorted(history_dir.glob("session_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-            for old_file in all_files[10:]:
+            for old_file in all_files[HISTORY_MAX_FILES:]:
                 try:
                     old_file.unlink()
                     debug_log(f"自動清理舊歷史文件: {old_file.name}")
@@ -544,7 +554,7 @@ def setup_routes(manager: "WebUIManager"):
 
         try:
             # 使用統一的設定檔案路徑
-            config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
+            config_dir = get_config_dir()
             settings_file = config_dir / "ui_settings.json"
 
             if settings_file.exists():
@@ -587,7 +597,7 @@ def setup_routes(manager: "WebUIManager"):
                 )
 
             # 使用統一的設定檔案路徑
-            config_dir = Path.home() / ".config" / "mcp-feedback-enhanced"
+            config_dir = get_config_dir()
             config_dir.mkdir(parents=True, exist_ok=True)
             settings_file = config_dir / "ui_settings.json"
 
@@ -673,7 +683,7 @@ def _auto_save_session_to_history(manager: "WebUIManager", session) -> None:
     """將 session 紀錄追加/更新到磁碟歷史文件"""
     try:
         from ..models import SessionStatus
-        history_dir = Path.home() / ".config" / "mcp-feedback-enhanced" / "history"
+        history_dir = get_config_dir() / "history"
         history_dir.mkdir(parents=True, exist_ok=True)
         group_id = manager.process_session_id
         history_file = history_dir / f"session_{group_id}.json"
@@ -713,7 +723,7 @@ def _auto_save_session_to_history(manager: "WebUIManager", session) -> None:
 
         # 最多保留 10 個文件
         all_files = sorted(history_dir.glob("session_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-        for old_file in all_files[10:]:
+        for old_file in all_files[HISTORY_MAX_FILES:]:
             try:
                 old_file.unlink()
             except Exception:
@@ -790,14 +800,3 @@ async def handle_websocket_message(manager: "WebUIManager", session, data: dict)
 
     else:
         debug_log(f"未知的消息類型: {message_type}")
-
-
-async def _delayed_server_stop(manager: "WebUIManager"):
-    """延遲停止服務器"""
-    import asyncio
-
-    await asyncio.sleep(5)  # 等待 5 秒讓前端有時間關閉
-    from ..main import stop_web_ui
-
-    stop_web_ui()
-    debug_log("Web UI 服務器已因用戶超時而停止")

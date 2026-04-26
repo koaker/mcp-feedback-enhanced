@@ -4,21 +4,15 @@ Web 回饋會話模型
 ===============
 
 管理 Web 回饋會話的資料和邏輯。
-
-注意：此文件中的 subprocess 調用已經過安全處理，使用 shlex.split() 解析命令
-並禁用 shell=True 以防止命令注入攻擊。
 """
 
 import asyncio
 import base64
-import shlex
-import subprocess
 import threading
 import time
 from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 from fastapi import WebSocket
@@ -26,7 +20,7 @@ from fastapi import WebSocket
 from ...debug import web_debug_log as debug_log
 from ...debug import info_log
 from ...utils.error_handler import ErrorHandler, ErrorType
-from ...utils.resource_manager import get_resource_manager, register_process
+from ...utils.resource_manager import get_resource_manager
 from ..constants import get_message_code
 
 
@@ -55,66 +49,9 @@ class CleanupReason(Enum):
 
 # 常數定義
 MAX_IMAGE_SIZE = 1 * 1024 * 1024  # 1MB 圖片大小限制
-SUPPORTED_IMAGE_TYPES = {
-    "image/png",
-    "image/jpeg",
-    "image/jpg",
-    "image/gif",
-    "image/bmp",
-    "image/webp",
-}
-TEMP_DIR = Path.home() / ".cache" / "interactive-feedback-mcp-web"
 
 # 訊息代碼現在從統一的常量文件導入
 # 使用 get_message_code 函數來獲取訊息代碼
-
-
-def _safe_parse_command(command: str) -> list[str]:
-    """
-    安全解析命令字符串，避免 shell 注入攻擊
-
-    Args:
-        command: 命令字符串
-
-    Returns:
-        list[str]: 解析後的命令參數列表
-
-    Raises:
-        ValueError: 如果命令包含不安全的字符
-    """
-    try:
-        # 使用 shlex 安全解析命令
-        parsed = shlex.split(command)
-
-        # 基本安全檢查：禁止某些危險字符和命令
-        dangerous_patterns = [
-            ";",
-            "&&",
-            "||",
-            "|",
-            ">",
-            "<",
-            "`",
-            "$(",
-            "rm -rf",
-            "del /f",
-            "format",
-            "fdisk",
-        ]
-
-        command_lower = command.lower()
-        for pattern in dangerous_patterns:
-            if pattern in command_lower:
-                raise ValueError(f"命令包含不安全的模式: {pattern}")
-
-        if not parsed:
-            raise ValueError("空命令")
-
-        return parsed
-
-    except Exception as e:
-        debug_log(f"命令解析失敗: {e}")
-        raise ValueError(f"無法安全解析命令: {e}") from e
 
 
 class WebFeedbackSession:
@@ -136,8 +73,6 @@ class WebFeedbackSession:
         self.images: list[dict] = []
         self.settings: dict[str, Any] = {}  # 圖片設定
         self.feedback_completed = threading.Event()
-        self.process: subprocess.Popen | None = None
-        self.command_logs: list[str] = []
         self.user_messages: list[dict] = []  # 用戶消息記錄
         self._cleanup_done = False  # 防止重複清理
         # 移除語言設定，改由前端處理
@@ -173,9 +108,6 @@ class WebFeedbackSession:
         self.user_timeout_enabled = False
         self.user_timeout_seconds = 3600  # 預設 1 小時
         self.user_timeout_timer: threading.Timer | None = None
-
-        # 確保臨時目錄存在
-        TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
         # 獲取資源管理器實例
         self.resource_manager = get_resource_manager()
@@ -382,20 +314,6 @@ class WebFeedbackSession:
             f"會話 {self.session_id} 自動清理定時器已設置，{self.auto_cleanup_delay}秒後觸發"
         )
 
-    def extend_cleanup_timer(self, additional_time: int | None = None):
-        """延長清理定時器"""
-        if additional_time is None:
-            additional_time = self.auto_cleanup_delay
-
-        if self.cleanup_timer:
-            self.cleanup_timer.cancel()
-
-        self.cleanup_timer = threading.Timer(additional_time, lambda: None)
-        self.cleanup_timer.daemon = True
-        self.cleanup_timer.start()
-
-        debug_log(f"會話 {self.session_id} 清理定時器已延長 {additional_time} 秒")
-
     def add_cleanup_callback(self, callback: Callable[..., None]):
         """添加清理回調函數"""
         if callback not in self.cleanup_callbacks:
@@ -420,8 +338,6 @@ class WebFeedbackSession:
                 "is_active": self.is_active(),
                 "status": self.status.value,
                 "has_websocket": self.websocket is not None,
-                "has_process": self.process is not None,
-                "command_logs_count": len(self.command_logs),
                 "images_count": len(self.images),
             }
         )
@@ -497,7 +413,6 @@ class WebFeedbackSession:
 
                 debug_log(f"會話 {self.session_id} 收到用戶回饋")
                 return {
-                    "logs": "\n".join(self.command_logs),
                     "interactive_feedback": self.feedback_result or "",
                     "images": self.images,
                     "settings": self.settings,
@@ -652,115 +567,6 @@ class WebFeedbackSession:
 
         return processed_images
 
-    def add_log(self, log_entry: str):
-        """添加命令日誌"""
-        self.command_logs.append(log_entry)
-
-    async def run_command(self, command: str):
-        """執行命令並透過 WebSocket 發送輸出（安全版本）"""
-        if self.process:
-            # 終止現有進程
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=5)
-            except:
-                try:
-                    self.process.kill()
-                except:
-                    pass
-            self.process = None
-
-        try:
-            debug_log(f"執行命令: {command}")
-
-            # 安全解析命令
-            try:
-                parsed_command = _safe_parse_command(command)
-            except ValueError as e:
-                error_msg = f"命令安全檢查失敗: {e}"
-                debug_log(error_msg)
-                if self.websocket:
-                    await self.websocket.send_json(
-                        {"type": "command_error", "error": error_msg}
-                    )
-                return
-
-            # 使用安全的方式執行命令（不使用 shell=True）
-            self.process = subprocess.Popen(
-                parsed_command,
-                shell=False,  # 安全：不使用 shell
-                cwd=self.project_directory,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-            )
-
-            # 註冊進程到資源管理器
-            register_process(
-                self.process,
-                description=f"WebFeedbackSession-{self.session_id}-command",
-                auto_cleanup=True,
-            )
-
-            # 在背景線程中讀取輸出
-            async def read_output():
-                loop = asyncio.get_event_loop()
-                try:
-                    # 使用線程池執行器來處理阻塞的讀取操作
-                    def read_line():
-                        if self.process and self.process.stdout:
-                            return self.process.stdout.readline()
-                        return ""
-
-                    while True:
-                        line = await loop.run_in_executor(None, read_line)
-                        if not line:
-                            break
-
-                        self.add_log(line.rstrip())
-                        if self.websocket:
-                            try:
-                                await self.websocket.send_json(
-                                    {"type": "command_output", "output": line}
-                                )
-                            except Exception as e:
-                                debug_log(f"WebSocket 發送失敗: {e}")
-                                break
-
-                except Exception as e:
-                    debug_log(f"讀取命令輸出錯誤: {e}")
-                finally:
-                    # 等待進程完成
-                    if self.process:
-                        exit_code = self.process.wait()
-
-                        # 從資源管理器取消註冊進程
-                        self.resource_manager.unregister_process(self.process.pid)
-
-                        # 發送命令完成信號
-                        if self.websocket:
-                            try:
-                                await self.websocket.send_json(
-                                    {"type": "command_complete", "exit_code": exit_code}
-                                )
-                            except Exception as e:
-                                debug_log(f"發送完成信號失敗: {e}")
-
-            # 啟動異步任務讀取輸出
-            asyncio.create_task(read_output())
-
-        except Exception as e:
-            debug_log(f"執行命令錯誤: {e}")
-            if self.websocket:
-                try:
-                    await self.websocket.send_json(
-                        {"type": "command_error", "error": str(e)}
-                    )
-                except:
-                    pass
-
     async def _cleanup_resources_on_timeout(self):
         """超時時清理所有資源（保持向後兼容）"""
         await self._cleanup_resources_enhanced(CleanupReason.TIMEOUT)
@@ -839,38 +645,20 @@ class WebFeedbackSession:
                 finally:
                     self.websocket = None
 
-            # 3. 終止正在運行的命令進程
-            if self.process:
-                try:
-                    self.process.terminate()
-                    try:
-                        self.process.wait(timeout=3)
-                        debug_log(f"會話 {self.session_id} 命令進程已正常終止")
-                    except subprocess.TimeoutExpired:
-                        self.process.kill()
-                        debug_log(f"會話 {self.session_id} 命令進程已強制終止")
-                    resources_cleaned += 1
-                except Exception as e:
-                    debug_log(f"終止命令進程時發生錯誤: {e}")
-                finally:
-                    self.process = None
-
-            # 4. 設置完成事件（防止其他地方還在等待）
+            # 3. 設置完成事件（防止其他地方還在等待）
             self.feedback_completed.set()
 
-            # 5. 清理臨時數據
-            logs_count = len(self.command_logs)
+            # 4. 清理臨時數據
             images_count = len(self.images)
 
-            self.command_logs.clear()
             self.images.clear()
             self.settings.clear()
 
-            if logs_count > 0 or images_count > 0:
-                resources_cleaned += logs_count + images_count
-                debug_log(f"清理了 {logs_count} 條日誌和 {images_count} 張圖片")
+            if images_count > 0:
+                resources_cleaned += images_count
+                debug_log(f"清理了 {images_count} 張圖片")
 
-            # 6. 更新會話狀態
+            # 5. 更新會話狀態
             if reason == CleanupReason.EXPIRED:
                 self.status = SessionStatus.EXPIRED
             elif reason == CleanupReason.TIMEOUT:
@@ -880,7 +668,7 @@ class WebFeedbackSession:
             else:
                 self.status = SessionStatus.COMPLETED
 
-            # 7. 調用清理回調函數
+            # 6. 調用清理回調函數
             for callback in self.cleanup_callbacks:
                 try:
                     if asyncio.iscoroutinefunction(callback):
@@ -890,7 +678,7 @@ class WebFeedbackSession:
                 except Exception as e:
                     debug_log(f"清理回調執行失敗: {e}")
 
-            # 8. 計算清理效果
+            # 7. 計算清理效果
             cleanup_duration = time.time() - cleanup_start_time
             memory_after = 0
             try:
@@ -974,39 +762,19 @@ class WebFeedbackSession:
                 self.cleanup_timer = None
                 resources_cleaned += 1
 
-            # 2. 清理進程
-            if self.process:
-                try:
-                    self.process.terminate()
-                    self.process.wait(timeout=5)
-                    debug_log(f"會話 {self.session_id} 命令進程已正常終止")
-                    resources_cleaned += 1
-                except:
-                    try:
-                        self.process.kill()
-                        debug_log(f"會話 {self.session_id} 命令進程已強制終止")
-                        resources_cleaned += 1
-                    except:
-                        pass
-                self.process = None
-
-            # 3. 清理臨時數據
-            logs_count = len(self.command_logs)
+            # 2. 清理臨時數據
             images_count = len(self.images)
 
-            self.command_logs.clear()
             if not preserve_websocket:
                 self.images.clear()
                 self.settings.clear()
                 resources_cleaned += images_count
 
-            resources_cleaned += logs_count
-
-            # 4. 設置完成事件
+            # 3. 設置完成事件
             if not preserve_websocket:
                 self.feedback_completed.set()
 
-            # 5. 更新狀態
+            # 4. 更新狀態
             if not preserve_websocket:
                 if reason == CleanupReason.EXPIRED:
                     self.status = SessionStatus.EXPIRED
@@ -1019,7 +787,7 @@ class WebFeedbackSession:
 
                 self._cleanup_done = True
 
-            # 6. 調用清理回調函數（同步版本）
+            # 5. 調用清理回調函數（同步版本）
             for callback in self.cleanup_callbacks:
                 try:
                     if not asyncio.iscoroutinefunction(callback):
@@ -1027,7 +795,7 @@ class WebFeedbackSession:
                 except Exception as e:
                     debug_log(f"同步清理回調執行失敗: {e}")
 
-            # 7. 計算清理效果
+            # 6. 計算清理效果
             cleanup_duration = time.time() - cleanup_start_time
             memory_after = 0
             try:

@@ -7,7 +7,6 @@ Web UI 主要管理類
 """
 
 import asyncio
-import concurrent.futures
 import os
 import threading
 import time
@@ -164,52 +163,12 @@ class WebUIManager:
         # 設置路由（必須同步）
         setup_routes(self)
 
-    async def _init_async_components(self):
-        """異步初始化組件（並行執行）"""
+    def _init_components(self):
+        """初始化組件"""
         with self._initialization_lock:
             if self._initialization_complete:
                 return
-
-        debug_log("開始並行初始化組件...")
-        start_time = time.time()
-
-        # 創建並行任務
-        tasks = []
-
-        # 任務：I18N 預載入（如果需要）
-        tasks.append(self._preload_i18n_async())
-
-        # 並行執行所有任務
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # 檢查結果
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    debug_log(f"並行初始化任務 {i} 失敗: {result}")
-
-        with self._initialization_lock:
             self._initialization_complete = True
-
-        elapsed = time.time() - start_time
-        debug_log(f"並行初始化完成，耗時: {elapsed:.2f}秒")
-
-    async def _preload_i18n_async(self):
-        """異步預載入 I18N 資源"""
-
-        def preload_i18n():
-            try:
-                # I18N 在前端處理，這裡只記錄預載入完成
-                debug_log("I18N 資源預載入完成（前端處理）")
-                return True
-            except Exception as e:
-                debug_log(f"I18N 資源預載入失敗: {e}")
-                return False
-
-        # 在線程池中執行
-        loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, preload_i18n)
 
     def _setup_compression_middleware(self):
         """設置壓縮和緩存中間件"""
@@ -571,18 +530,9 @@ class WebUIManager:
                     server_instance = uvicorn.Server(config)
                     self._uvicorn_server = server_instance  # 保存引用
 
-                    # 創建事件循環並啟動服務器
-                    async def serve_with_async_init(server=server_instance):
-                        # 在服務器啟動的同時進行異步初始化
-                        server_task = asyncio.create_task(server.serve())
-                        init_task = asyncio.create_task(self._init_async_components())
-
-                        # 等待兩個任務完成
-                        await asyncio.gather(
-                            server_task, init_task, return_exceptions=True
-                        )
-
-                    asyncio.run(serve_with_async_init())
+                    # 啟動服務器
+                    self._init_components()
+                    asyncio.run(server_instance.serve())
 
                     # 成功啟動，顯示最終使用的端口
                     if self.port != original_port:

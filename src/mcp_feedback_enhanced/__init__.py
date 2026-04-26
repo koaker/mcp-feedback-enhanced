@@ -29,15 +29,11 @@ from .server import main as run_server
 from .web import WebUIManager, get_web_ui_manager, launch_web_feedback_ui, stop_web_ui
 
 
-# 保持向後兼容性
-feedback_ui = None
-
 # 主要導出介面
 __all__ = [
     "WebUIManager",
     "__author__",
     "__version__",
-    "feedback_ui",
     "get_web_ui_manager",
     "launch_web_feedback_ui",
     "run_server",
