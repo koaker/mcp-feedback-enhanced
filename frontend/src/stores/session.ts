@@ -15,6 +15,7 @@ export const useSessionStore = defineStore('session', () => {
   const allSessions = ref<Session[]>([])
   const commandLogs = ref<string[]>([])
   const wsStatus = ref<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected')
+  const sessionCreatedAt = ref<number | null>(null)
 
   const isWaiting = computed(() => !hasSession.value)
   const isActive = computed(() => hasSession.value && !feedbackCompleted.value)
@@ -63,6 +64,7 @@ export const useSessionStore = defineStore('session', () => {
     project_directory: string
     summary: string
     session_id: string
+    created_at?: number
   }) {
     sessionStatus.value = info.status as SessionStatus
     statusMessage.value = info.message
@@ -71,9 +73,10 @@ export const useSessionStore = defineStore('session', () => {
     summary.value = info.summary
     sessionId.value = info.session_id
     hasSession.value = true
+    if (info.created_at) sessionCreatedAt.value = info.created_at * 1000 // backend sends seconds
   }
 
-  function setNewSession(info: { session_id: string; project_directory: string; summary: string }) {
+  function setNewSession(info: { session_id: string; project_directory: string; summary: string; created_at?: number }) {
     sessionId.value = info.session_id
     projectDirectory.value = info.project_directory
     summary.value = info.summary
@@ -81,6 +84,7 @@ export const useSessionStore = defineStore('session', () => {
     hasSession.value = true
     commandLogs.value = []
     sessionStatus.value = 'waiting'
+    if (info.created_at) sessionCreatedAt.value = info.created_at * 1000
   }
 
   function appendCommandLog(line: string) {
@@ -117,7 +121,7 @@ export const useSessionStore = defineStore('session', () => {
   return {
     hasSession, sessionId, projectDirectory, summary,
     feedbackCompleted, sessionStatus, statusMessage,
-    allSessions, commandLogs, wsStatus,
+    allSessions, commandLogs, wsStatus, sessionCreatedAt,
     isWaiting, isActive,
     fetchStatus, fetchCurrentSession, fetchAllSessions,
     updateFromWS, setNewSession, appendCommandLog, clearCommandLogs,

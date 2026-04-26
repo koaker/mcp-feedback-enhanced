@@ -50,9 +50,11 @@ const layoutMode = computed(() => settingsStore.settings.layoutMode || 'combined
 }
 
 .feedback-page--combined-vertical .feedback-page__summary {
-  flex: 0 0 40%;
+  flex: 0 0 45%;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .feedback-page--combined-vertical .feedback-page__right {

@@ -49,6 +49,7 @@ import { useSettingsStore } from '../../stores/settings'
 import { useSessionStore } from '../../stores/session'
 import { wsManager } from '../../api/websocket'
 import { useAutoSubmit } from '../../composables/useTimer'
+import { useDraft } from '../../composables/useDraft'
 import { storeToRefs } from 'pinia'
 
 const i18n = useI18nStore()
@@ -60,6 +61,8 @@ const text = ref('')
 const images = ref<ImageItem[]>([])
 const submitting = ref(false)
 const submitted = ref(false)
+
+const { load: loadDraft, clear: clearDraft } = useDraft(sessionId, text, images)
 
 function resetForm() {
   text.value = ''
@@ -85,6 +88,7 @@ const autoSubmitLabel = computed(() => i18n.t('feedback.autoSubmit').replace('{s
 const { remaining, start: startAutoSubmit, stop: stopAutoSubmit, reset: resetAutoSubmit } = useAutoSubmit(doSubmit)
 
 onMounted(() => {
+  loadDraft()
   if (autoSubmitEnabled.value) startAutoSubmit()
 })
 
@@ -141,6 +145,7 @@ function doSubmit() {
     },
   })
 
+  clearDraft()
   submitting.value = false
   submitted.value = true
 }

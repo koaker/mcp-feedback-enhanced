@@ -29,9 +29,21 @@
       </div>
       <span class="app-layout__brand">MCP Feedback Enhanced <span v-if="version" class="app-layout__version">{{ version }}</span></span>
       <div class="app-layout__header-right">
+        <span v-if="timeoutLabel" class="app-layout__timeout-label" :class="{ urgent: isUrgent }">
+          {{ timeoutLabel }}
+        </span>
         <WsStatusBadge :status="wsStatus" />
       </div>
     </header>
+
+    <!-- Timeout progress bar (below header) -->
+    <div v-if="timeoutEnabled && hasSession" class="app-layout__timeout-bar">
+      <div
+        class="app-layout__timeout-bar-fill"
+        :class="{ urgent: isUrgent }"
+        :style="{ width: (progress * 100) + '%' }"
+      />
+    </div>
 
     <!-- Settings top drawer -->
     <!-- REMOVED - now using side drawer -->
@@ -106,16 +118,20 @@ import LogPanel from '../logs/LogPanel.vue'
 import { useI18nStore } from '../../stores/i18n'
 import { useSettingsStore } from '../../stores/settings'
 import { useSessionStore } from '../../stores/session'
+import { useTimeoutCountdown } from '../../composables/useTimer'
 import { storeToRefs } from 'pinia'
 
 const i18n = useI18nStore()
 const settingsStore = useSettingsStore()
 const sessionStore = useSessionStore()
-const { wsStatus } = storeToRefs(sessionStore)
+const { wsStatus, hasSession } = storeToRefs(sessionStore)
 const activeDrawer = ref<'settings' | 'history' | 'logs' | null>(null)
 const layoutMode = computed(() => settingsStore.settings.layoutMode || 'combined-vertical')
 const drawerWidth = ref(480)
 const version = ref('')
+
+const timeoutEnabled = computed(() => settingsStore.settings.timeoutEnabled ?? false)
+const { progress, label: timeoutLabel, isUrgent, start: startCountdown } = useTimeoutCountdown()
 
 onMounted(async () => {
   try {
@@ -125,6 +141,7 @@ onMounted(async () => {
   } catch {
     // version API not available
   }
+  if (timeoutEnabled.value) startCountdown()
 })
 
 function toggleDrawer(panel: 'settings' | 'history' | 'logs') {
@@ -309,4 +326,34 @@ function startResize(e: MouseEvent) {
 /* Side drawer slide-in transition */
 .side-drawer-enter-active, .side-drawer-leave-active { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
 .side-drawer-enter-from, .side-drawer-leave-to { transform: translateX(-100%); }
+
+/* Timeout progress bar */
+.app-layout__timeout-bar {
+  height: 3px;
+  background: var(--border);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.app-layout__timeout-bar-fill {
+  height: 100%;
+  background: rgba(99, 102, 241, 0.7);
+  transition: width 1s linear, background 0.3s;
+}
+
+.app-layout__timeout-bar-fill.urgent {
+  background: rgba(239, 68, 68, 0.85);
+}
+
+/* Timeout countdown label */
+.app-layout__timeout-label {
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+.app-layout__timeout-label.urgent {
+  color: #fca5a5;
+}
 </style>
