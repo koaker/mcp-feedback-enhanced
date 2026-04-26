@@ -668,7 +668,12 @@
     "layoutHorizontal": "水平布局（摘要在左）",
     "theme": "界面主题",
     "themeLight": "浅色",
-    "themeDark": "深色"
+    "themeDark": "深色",
+    "restartServer": "重启 Web 服务",
+    "restartServerDesc": "重启 Web 服务器（MCP 主进程不受影响）",
+    "restartServerConfirm": "确定要重启 Web 服务器吗？页面将短暂断开连接。",
+    "restartServerSuccess": "Web 服务器正在重启，请稍候...",
+    "restartServerError": "重启失败，请手动重启 opencode"
   },
   "waiting": {
     "title": "等待 AI 工作中",

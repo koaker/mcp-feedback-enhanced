@@ -91,12 +91,15 @@
 
     <div class="settings-panel__actions">
       <button class="settings-panel__reset" @click="resetSettings">{{ i18n.t('settings.reset') }}</button>
+      <button class="settings-panel__restart" @click="restartServer" :disabled="restarting">
+        {{ restarting ? i18n.t('settings.restartServerSuccess') : i18n.t('settings.restartServer') }}
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18nStore } from '../../stores/i18n'
 import { useSettingsStore } from '../../stores/settings'
 import { useTimeout } from '../../composables/useTimer'
@@ -106,6 +109,8 @@ const i18n = useI18nStore()
 const settingsStore = useSettingsStore()
 const settings = computed(() => settingsStore.settings)
 const { syncToServer } = useTimeout()
+
+const restarting = ref(false)
 
 const lang = computed({
   get: () => (settingsStore.settings.language as 'zh-CN' | 'zh-TW' | 'en') || 'zh-CN',
@@ -133,6 +138,20 @@ function onTimeoutChange() {
 
 async function resetSettings() {
   await settingsStore.clear()
+}
+
+async function restartServer() {
+  if (!confirm(i18n.t('settings.restartServerConfirm'))) return
+  restarting.value = true
+  try {
+    await fetch('/api/restart-server', { method: 'POST' })
+  } catch {
+    // ignore network error — server is restarting
+  }
+  // Wait a few seconds then reload
+  setTimeout(() => {
+    window.location.reload()
+  }, 4000)
 }
 </script>
 
@@ -186,6 +205,7 @@ async function resetSettings() {
   margin-top: 0.5rem;
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .settings-panel__reset {
@@ -198,4 +218,16 @@ async function resetSettings() {
   cursor: pointer;
 }
 .settings-panel__reset:hover { background: rgba(239, 68, 68, 0.2); }
+
+.settings-panel__restart {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  color: #93c5fd;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+}
+.settings-panel__restart:hover:not(:disabled) { background: rgba(59, 130, 246, 0.2); }
+.settings-panel__restart:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

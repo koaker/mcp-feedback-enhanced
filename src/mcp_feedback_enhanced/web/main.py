@@ -134,6 +134,7 @@ class WebUIManager:
 
         self.server_thread: threading.Thread | None = None
         self.server_process = None
+        self._uvicorn_server: uvicorn.Server | None = None  # uvicorn 實例引用，用於熱重啟
         self.desktop_app_instance: Any = None  # 桌面應用實例引用
 
         # 初始化標記，用於追蹤異步初始化狀態
@@ -562,6 +563,7 @@ class WebUIManager:
                     )
 
                     server_instance = uvicorn.Server(config)
+                    self._uvicorn_server = server_instance  # 保存引用
 
                     # 創建事件循環並啟動服務器
                     async def serve_with_async_init(server=server_instance):
@@ -1068,6 +1070,48 @@ class WebUIManager:
             if session.is_expired():
                 expired_sessions.append(session_id)
         return expired_sessions
+
+    def restart_server(self) -> bool:
+        """熱重啟 Web 服務器（只重啟 uvicorn 線程，主 MCP 進程不受影響）
+
+        Returns:
+            bool: True 表示重啟成功，False 表示重啟失敗
+        """
+        debug_log("開始熱重啟 Web 服務器...")
+
+        # 步驟 1：通知 uvicorn 退出
+        if self._uvicorn_server is not None:
+            try:
+                self._uvicorn_server.should_exit = True
+                debug_log("已設置 uvicorn should_exit = True")
+            except Exception as e:
+                debug_log(f"設置 uvicorn should_exit 失敗: {e}")
+
+        # 步驟 2：等待舊線程結束（最多 8 秒）
+        if self.server_thread is not None and self.server_thread.is_alive():
+            debug_log("等待舊 uvicorn 線程結束...")
+            self.server_thread.join(timeout=8)
+            if self.server_thread.is_alive():
+                debug_log("警告：舊 uvicorn 線程在 8 秒內未能退出，繼續強制重啟")
+            else:
+                debug_log("舊 uvicorn 線程已正常退出")
+
+        # 步驟 3：重置引用
+        self._uvicorn_server = None
+        self.server_thread = None
+        self._initialization_complete = False
+
+        # 步驟 4：短暫等待端口釋放
+        time.sleep(1)
+
+        # 步驟 5：重啟服務器
+        try:
+            self.start_server()
+            debug_log("Web 服務器熱重啟成功")
+            return True
+        except Exception as e:
+            debug_log(f"Web 服務器熱重啟失敗: {e}")
+            return False
 
     def stop(self):
         """停止 Web UI 服務"""

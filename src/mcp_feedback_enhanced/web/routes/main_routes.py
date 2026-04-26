@@ -621,6 +621,29 @@ def setup_routes(manager: "WebUIManager"):
                 },
             )
 
+    @manager.app.post("/api/restart-server")
+    async def restart_server(request: Request):
+        """熱重啟 Web 服務器（只重啟 uvicorn 線程，MCP 主進程不受影響）"""
+        import asyncio
+        import threading
+
+        debug_log("收到熱重啟請求")
+
+        def do_restart():
+            manager.restart_server()
+
+        # 在後台線程執行重啟，避免在請求處理中直接停止自身
+        t = threading.Thread(target=do_restart, daemon=True)
+        t.start()
+
+        return JSONResponse(
+            content={
+                "status": "restarting",
+                "message": "Web server is restarting. Please wait a few seconds and refresh.",
+                "messageCode": "server.restarting",
+            }
+        )
+
 
 async def handle_websocket_message(manager: "WebUIManager", session, data: dict):
     """處理 WebSocket 消息"""

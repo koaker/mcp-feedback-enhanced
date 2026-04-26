@@ -657,6 +657,11 @@
   "settings": {
     "theme": "介面主題",
     "themeLight": "淺色",
-    "themeDark": "深色"
+    "themeDark": "深色",
+    "restartServer": "重啟 Web 服務",
+    "restartServerDesc": "重啟 Web 伺服器（MCP 主進程不受影響）",
+    "restartServerConfirm": "確定要重啟 Web 伺服器嗎？頁面將短暫斷線。",
+    "restartServerSuccess": "Web 伺服器正在重啟，請稍候...",
+    "restartServerError": "重啟失敗，請手動重啟 opencode"
   }
 }

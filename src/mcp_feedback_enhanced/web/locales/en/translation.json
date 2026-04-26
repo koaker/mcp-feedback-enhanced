@@ -652,6 +652,11 @@
   "settings": {
     "theme": "Theme",
     "themeLight": "Light",
-    "themeDark": "Dark"
+    "themeDark": "Dark",
+    "restartServer": "Restart Web Server",
+    "restartServerDesc": "Restart the web server (MCP main process is unaffected)",
+    "restartServerConfirm": "Restart the web server? The page will briefly disconnect.",
+    "restartServerSuccess": "Web server is restarting, please wait...",
+    "restartServerError": "Restart failed, please restart opencode manually"
   }
 }
