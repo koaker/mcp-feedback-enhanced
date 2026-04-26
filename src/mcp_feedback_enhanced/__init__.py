@@ -27,27 +27,46 @@ __author__ = "Minidoracat"
 __email__ = "minidora0702@gmail.com"
 
 
-def _get_git_hash() -> str:
-    """在运行時获取当前 git commit 短哈希，失败时返回空字符串"""
+def _get_git_info() -> tuple[str, bool]:
+    """在运行時获取 git commit 短哈希和脏状态，失败时返回空字符串"""
     try:
-        # 定位包根目錄（当前文件所在目录的父目录）
         pkg_dir = Path(__file__).resolve().parent.parent
-        result = subprocess.run(
+
+        # 获取短哈希
+        hash_result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
             text=True,
             cwd=pkg_dir,
             timeout=2,
         )
-        if result.returncode == 0:
-            return result.stdout.strip()
+        if hash_result.returncode != 0:
+            return "", False
+
+        git_hash = hash_result.stdout.strip()
+
+        # 检测工作区是否脏（有未提交的改动）
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            cwd=pkg_dir,
+            timeout=2,
+        )
+        is_dirty = bool(status_result.stdout.strip())
+
+        return git_hash, is_dirty
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        pass
-    return ""
+        return "", False
 
 
-_git_hash = _get_git_hash()
-__version__ = f"{__base_version__}+{_git_hash}" if _git_hash else __base_version__
+_git_hash, _git_dirty = _get_git_info()
+if _git_hash:
+    __version__ = f"{__base_version__}+{_git_hash}"
+    if _git_dirty:
+        __version__ += "-dirty"
+else:
+    __version__ = __base_version__
 
 from .server import main as run_server
 
