@@ -169,8 +169,8 @@ class WebFeedbackSession:
 
         self.last_activity = time.time()
 
-        # 如果會話變為已提交狀態，重置清理定時器
-        if next_status == SessionStatus.FEEDBACK_SUBMITTED:
+        # 如果會話變為活躍或已提交狀態，重置清理定時器
+        if next_status in (SessionStatus.ACTIVE, SessionStatus.FEEDBACK_SUBMITTED):
             self._schedule_auto_cleanup()
 
         debug_log(
@@ -452,8 +452,11 @@ class WebFeedbackSession:
         self.images = self._process_images(images)
         info_log(f"反馈已提交: session {self.session_id[:8]}... 图片数: {len(self.images)}", "FEEDBACK")
 
-        # 進入下一步：等待中 → 已提交反饋
-        self.next_step("已送出反饋，等待下次 MCP 調用")
+        # 直接設置為已提交反饋狀態（跳過 ACTIVE 中間態，因為 WebSocket 連接時未觸發 next_step）
+        old_status = self.status
+        self.status = SessionStatus.FEEDBACK_SUBMITTED
+        self.status_message = "已送出反饋，等待下次 MCP 調用"
+        debug_log(f"✅ 會話 {self.session_id} 狀態流轉: {old_status.value} → {self.status.value} - {self.status_message}")
 
         self.feedback_completed.set()
 

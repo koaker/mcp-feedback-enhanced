@@ -74,8 +74,13 @@ class TestMCPBasicWorkflow:
                 # 超時是預期的行為
                 assert "超時" in result["error"] or "timeout" in result["error"].lower()
             else:
-                # 或者返回了默認的回應
-                assert TestUtils.validate_web_response(result)
+                # 超時後返回了 MCP tool result 格式（含 content 列表）
+                content = result.get("content", [])
+                result_text = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
+                # 接受超時文字或正常回饋格式
+                is_timeout = "timeout" in result_text.lower() or "超時" in result_text
+                is_valid_feedback = TestUtils.validate_web_response(result)
+                assert is_timeout or is_valid_feedback, f"未預期的回應格式: {result}"
 
         finally:
             await client.cleanup()

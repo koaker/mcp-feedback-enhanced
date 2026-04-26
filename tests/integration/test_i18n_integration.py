@@ -168,7 +168,7 @@ class TestI18NEnvironmentIntegration:
                 {"LANG": "zh_TW.UTF-8", "expected": "zh-TW"},
                 {"LANG": "zh_CN.UTF-8", "expected": "zh-CN"},
                 {"LANG": "en_US.UTF-8", "expected": "en"},
-                {"LANG": "ja_JP.UTF-8", "expected": "en"},  # 不支援的語言應回退
+                {"LANG": "ja_JP.UTF-8", "expected": "zh-TW"},  # 不支援的語言應回退到預設語言 zh-TW
             ]
 
             for test_case in test_cases:
@@ -217,20 +217,19 @@ class TestI18NEnvironmentIntegration:
 
     def test_i18n_with_web_ui_manager(self, web_ui_manager, i18n_manager):
         """測試 I18N 與 WebUIManager 的集成"""
-        # 驗證 WebUIManager 使用了 I18N 管理器
-        assert hasattr(web_ui_manager, "i18n")
-        assert web_ui_manager.i18n is not None
+        # WebUIManager 已移至前端處理 i18n，不再持有 i18n 屬性
+        # 驗證 WebUIManager 是正常初始化的實例
+        assert web_ui_manager is not None
+        assert web_ui_manager.app is not None
 
-        # 測試語言切換對 WebUIManager 的影響
+        # 驗證 i18n_manager 本身正常工作
         original_lang = i18n_manager.get_current_language()
 
         for lang in TestData.SUPPORTED_LANGUAGES:
             if lang != original_lang:
                 success = i18n_manager.set_language(lang)
                 assert success == True
-
-                # WebUIManager 應該能夠訪問當前語言設置
-                current_lang = web_ui_manager.i18n.get_current_language()
+                current_lang = i18n_manager.get_current_language()
                 assert current_lang == lang
                 break
 

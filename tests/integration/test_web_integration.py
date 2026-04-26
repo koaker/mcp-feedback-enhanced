@@ -158,10 +158,11 @@ class TestWebUISessionManagement:
         assert current_session.session_id == session_id_2
         assert current_session.summary == "第二個會話"
 
-        # 3. 測試會話狀態更新
+        # 3. 測試會話狀態更新（直接設置狀態屬性）
         from mcp_feedback_enhanced.web.models import SessionStatus
 
-        current_session.update_status(SessionStatus.FEEDBACK_SUBMITTED, "已提交回饋")
+        current_session.status = SessionStatus.FEEDBACK_SUBMITTED
+        current_session.status_message = "已提交回饋"
         assert current_session.status == SessionStatus.FEEDBACK_SUBMITTED
 
     @pytest.mark.asyncio

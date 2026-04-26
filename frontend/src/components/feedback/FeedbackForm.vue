@@ -54,22 +54,29 @@ import { storeToRefs } from 'pinia'
 const i18n = useI18nStore()
 const settingsStore = useSettingsStore()
 const sessionStore = useSessionStore()
-const { sessionId } = storeToRefs(sessionStore)
+const { sessionId, sessionStatus } = storeToRefs(sessionStore)
 
 const text = ref('')
 const images = ref<ImageItem[]>([])
 const submitting = ref(false)
 const submitted = ref(false)
 
-// 新 session 到来时重置表单，解除输入框锁定
+function resetForm() {
+  text.value = ''
+  images.value = []
+  submitting.value = false
+  submitted.value = false
+  if (autoSubmitEnabled.value) startAutoSubmit()
+}
+
+// 新 session 到来时重置表单（sessionId 变化）
 watch(sessionId, (newId, oldId) => {
-  if (newId && newId !== oldId) {
-    text.value = ''
-    images.value = []
-    submitting.value = false
-    submitted.value = false
-    if (autoSubmitEnabled.value) startAutoSubmit()
-  }
+  if (newId && newId !== oldId) resetForm()
+})
+
+// sessionStatus 变为 waiting 时也重置（防止 sessionId 未变但状态已重置的情况）
+watch(sessionStatus, (newStatus) => {
+  if (newStatus === 'waiting' && submitted.value) resetForm()
 })
 
 const autoSubmitEnabled = computed(() => settingsStore.settings.autoSubmitEnabled ?? false)

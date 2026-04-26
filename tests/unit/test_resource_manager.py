@@ -105,7 +105,7 @@ class TestResourceManager:
 
         # 創建一個簡單的進程
         process = subprocess.Popen(
-            ["python", "-c", "import time; time.sleep(0.1)"],
+            ["python3", "-c", "import time; time.sleep(0.1)"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )

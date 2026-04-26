@@ -191,7 +191,8 @@ class TestWebUIRoutes:
         response = client.get("/")
 
         assert response.status_code == 200
-        assert TestData.SAMPLE_SESSION["summary"] in response.text
+        # SPA 模式：主頁返回 index.html，summary 由前端 JS 動態加載，不在靜態 HTML 中
+        assert "text/html" in response.headers.get("content-type", "")
 
     @pytest.mark.asyncio
     async def test_api_current_session(self, web_ui_manager, test_project_dir):

@@ -93,9 +93,10 @@ class TestWebFeedbackSessionCleanup:
         assert self.session.cleanup_timer is not None
         assert self.session.cleanup_timer.is_alive()
 
-        # 驗證定時器可被取消（清理後不存活）
-        old_timer = self.session.cleanup_timer
+        # 驗證定時器可被取消
         self.session.cleanup_timer.cancel()
+        # cancel() 只是設置取消標誌，需等待線程退出
+        self.session.cleanup_timer.join(timeout=1.0)
         assert not self.session.cleanup_timer.is_alive()
 
     def test_cleanup_callbacks(self):

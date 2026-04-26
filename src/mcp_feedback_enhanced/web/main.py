@@ -776,6 +776,9 @@ class WebUIManager:
 
         except Exception as e:
             debug_log(f"發送刷新通知失敗: {e}")
+            # 發送失敗，清理死連接
+            if self.current_session:
+                self.current_session.websocket = None
             return False
 
     async def _check_active_tabs(self) -> bool:
@@ -790,50 +793,30 @@ class WebUIManager:
             last_heartbeat = getattr(self.current_session, "last_heartbeat", None)
             if last_heartbeat:
                 heartbeat_age = time.time() - last_heartbeat
-                if heartbeat_age > 10:  # 超過 10 秒沒有心跳
-                    debug_log(f"快速檢測：心跳超時 ({heartbeat_age:.1f}秒)")
-                    # 可能連接已死，需要進一步檢測
-                else:
+                if heartbeat_age <= 30:  # 30 秒內有心跳，認為連接活躍
                     debug_log(f"快速檢測：心跳正常 ({heartbeat_age:.1f}秒前)")
-                    return True  # 心跳正常，認為連接活躍
+                    return True
+                debug_log(f"快速檢測：心跳超時 ({heartbeat_age:.1f}秒)，繼續狀態檢測")
 
-            # 準確檢測層：實際測試連接是否活著
-            try:
-                # 檢查 WebSocket 連接狀態
-                websocket = self.current_session.websocket
+            # 準確檢測層：檢查 WebSocket 連接狀態（不發 ping，避免副作用）
+            websocket = self.current_session.websocket
+            if hasattr(websocket, "client_state"):
+                try:
+                    import starlette.websockets  # type: ignore[import-not-found]
+                    if hasattr(starlette.websockets, "WebSocketState"):
+                        WebSocketState = starlette.websockets.WebSocketState
+                        if websocket.client_state != WebSocketState.CONNECTED:
+                            debug_log(
+                                f"準確檢測：WebSocket 狀態不是 CONNECTED，而是 {websocket.client_state}"
+                            )
+                            # 標記死連接但不立即清理，讓 notify 嘗試後再清理
+                            return False
+                except ImportError:
+                    debug_log("無法導入 WebSocketState，假設連接活躍")
 
-                # 檢查連接是否已關閉
-                if hasattr(websocket, "client_state"):
-                    try:
-                        # 嘗試從 starlette 導入（FastAPI 基於 Starlette）
-                        import starlette.websockets  # type: ignore[import-not-found]
-
-                        if hasattr(starlette.websockets, "WebSocketState"):
-                            WebSocketState = starlette.websockets.WebSocketState
-                            if websocket.client_state != WebSocketState.CONNECTED:
-                                debug_log(
-                                    f"準確檢測：WebSocket 狀態不是 CONNECTED，而是 {websocket.client_state}"
-                                )
-                                # 清理死連接
-                                self.current_session.websocket = None
-                                return False
-                    except ImportError:
-                        # 如果導入失敗，使用替代方法
-                        debug_log("無法導入 WebSocketState，使用替代方法檢測連接")
-                        # 跳過狀態檢查，直接測試連接
-
-                # 如果連接看起來是活的，嘗試發送 ping（非阻塞）
-                # 注意：FastAPI WebSocket 沒有內建的 ping 方法，這裡使用自定義消息
-                await websocket.send_json({"type": "ping", "timestamp": time.time()})
-                debug_log("準確檢測：成功發送 ping 消息，連接是活躍的")
-                return True
-
-            except Exception as e:
-                debug_log(f"準確檢測：連接測試失敗 - {e}")
-                # 連接已死，清理它
-                if self.current_session:
-                    self.current_session.websocket = None
-                return False
+            # 有 WebSocket 物件且狀態正常，認為活躍
+            debug_log("準確檢測：WebSocket 存在且狀態正常，認為連接活躍")
+            return True
 
         except Exception as e:
             debug_log(f"檢查活躍連接時發生錯誤：{e}")
