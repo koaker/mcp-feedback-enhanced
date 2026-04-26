@@ -1,4 +1,4 @@
-import { watch, type Ref } from 'vue'
+import { watch, ref, type Ref } from 'vue'
 import type { ImageItem } from '../types/session'
 
 const DRAFT_PREFIX = 'mcp_draft_'
@@ -18,6 +18,9 @@ export function useDraft(
   text: Ref<string>,
   images: Ref<ImageItem[]>,
 ) {
+  // When false, auto-save watcher is suppressed (during reset or load cycles)
+  const enabled = ref(true)
+
   function load() {
     const key = draftKey(sessionId.value)
     if (!key) return
@@ -25,14 +28,18 @@ export function useDraft(
       const raw = localStorage.getItem(key)
       if (!raw) return
       const draft: DraftData = JSON.parse(raw)
-      if (draft.text) text.value = draft.text
+      enabled.value = false
+      if (draft.text !== undefined) text.value = draft.text
       if (draft.images?.length) images.value = draft.images
+      // Re-enable after Vue has flushed reactive updates
+      setTimeout(() => { enabled.value = true }, 50)
     } catch {
       // ignore malformed draft
     }
   }
 
   function save() {
+    if (!enabled.value) return
     const key = draftKey(sessionId.value)
     if (!key) return
     try {
@@ -49,18 +56,11 @@ export function useDraft(
     localStorage.removeItem(key)
   }
 
+  function pause() { enabled.value = false }
+  function resume() { enabled.value = true }
+
   // Auto-save on every change
   watch([text, images], save, { deep: true })
 
-  // Load draft when sessionId changes
-  watch(sessionId, (newId, oldId) => {
-    // Clear old session draft only if it was a different session
-    if (oldId && oldId !== newId) {
-      const oldKey = draftKey(oldId)
-      if (oldKey) localStorage.removeItem(oldKey)
-    }
-    if (newId) load()
-  })
-
-  return { load, clear }
+  return { load, clear, pause, resume }
 }

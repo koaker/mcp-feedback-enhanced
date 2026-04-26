@@ -62,9 +62,10 @@ const images = ref<ImageItem[]>([])
 const submitting = ref(false)
 const submitted = ref(false)
 
-const { load: loadDraft, clear: clearDraft } = useDraft(sessionId, text, images)
+const { load: loadDraft, clear: clearDraft, pause: pauseDraft } = useDraft(sessionId, text, images)
 
 function resetForm() {
+  pauseDraft()
   text.value = ''
   images.value = []
   submitting.value = false
@@ -72,14 +73,20 @@ function resetForm() {
   if (autoSubmitEnabled.value) startAutoSubmit()
 }
 
-// 新 session 到来时重置表单（sessionId 变化）
+// 新 session 到来时重置表单（sessionId 变化），然后恢复草稿
 watch(sessionId, (newId, oldId) => {
-  if (newId && newId !== oldId) resetForm()
+  if (newId && newId !== oldId) {
+    resetForm()
+    loadDraft()
+  }
 })
 
 // sessionStatus 变为 waiting 时也重置（防止 sessionId 未变但状态已重置的情况）
 watch(sessionStatus, (newStatus) => {
-  if (newStatus === 'waiting' && submitted.value) resetForm()
+  if (newStatus === 'waiting' && submitted.value) {
+    resetForm()
+    loadDraft() // loadDraft handles re-enabling save internally
+  }
 })
 
 const autoSubmitEnabled = computed(() => settingsStore.settings.autoSubmitEnabled ?? false)
