@@ -17,6 +17,7 @@ MCP Interactive Feedback Enhanced
 - 重構的模組化架構
 """
 
+import hashlib
 import os
 import subprocess
 from pathlib import Path
@@ -27,46 +28,42 @@ __author__ = "Minidoracat"
 __email__ = "minidora0702@gmail.com"
 
 
-def _get_git_info() -> tuple[str, bool]:
-    """在运行時获取 git commit 短哈希和脏状态，失败时返回空字符串"""
+def _get_git_hash() -> str:
+    """获取当前 git commit 短哈希"""
     try:
         pkg_dir = Path(__file__).resolve().parent.parent
-
-        # 获取短哈希
-        hash_result = subprocess.run(
+        result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=pkg_dir,
-            timeout=2,
+            capture_output=True, text=True, cwd=pkg_dir, timeout=2,
         )
-        if hash_result.returncode != 0:
-            return "", False
-
-        git_hash = hash_result.stdout.strip()
-
-        # 检测工作区是否脏（有未提交的改动）
-        status_result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            cwd=pkg_dir,
-            timeout=2,
-        )
-        is_dirty = bool(status_result.stdout.strip())
-
-        return git_hash, is_dirty
+        if result.returncode == 0:
+            return result.stdout.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        return "", False
+        pass
+    return ""
 
 
-_git_hash, _git_dirty = _get_git_info()
+def _get_content_hash() -> str:
+    """计算所有 Python 源码文件的内容哈希（任意改动都会改变）"""
+    try:
+        src_dir = Path(__file__).resolve().parent
+        hasher = hashlib.sha256()
+        for py_file in sorted(src_dir.rglob("*.py")):
+            hasher.update(py_file.read_bytes())
+        return hasher.hexdigest()[:8]
+    except OSError:
+        return ""
+
+
+_git_hash = _get_git_hash()
+_content_hash = _get_content_hash()
+
+_version_parts = [__base_version__]
 if _git_hash:
-    __version__ = f"{__base_version__}+{_git_hash}"
-    if _git_dirty:
-        __version__ += "-dirty"
-else:
-    __version__ = __base_version__
+    _version_parts.append(_git_hash)
+if _content_hash:
+    _version_parts.append(_content_hash)
+__version__ = "+".join(_version_parts)
 
 from .server import main as run_server
 
