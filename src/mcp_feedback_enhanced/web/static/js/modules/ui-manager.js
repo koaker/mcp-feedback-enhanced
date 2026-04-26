@@ -415,30 +415,52 @@
     };
 
     /**
-     * 安全地渲染 Markdown 內容
+     * 安全地渲染 Markdown 内容
      */
     UIManager.prototype.renderMarkdownSafely = function(content) {
         try {
-            // 檢查 marked 和 DOMPurify 是否可用
+            // 检查 marked 和 DOMPurify 是否可用
             if (typeof window.marked === 'undefined' || typeof window.DOMPurify === 'undefined') {
-                console.warn('⚠️ Markdown 庫未載入，使用純文字顯示');
+                console.warn('⚠️ Markdown 库未加载，使用纯文字显示');
                 return this.escapeHtml(content);
+            }
+
+            // 配置 marked，让代码块保留 language 类名（供 highlight.js 使用）
+            if (window.marked.setOptions) {
+                window.marked.setOptions({
+                    gfm: true,
+                    breaks: false
+                });
             }
 
             // 使用 marked 解析 Markdown
             const htmlContent = window.marked.parse(content);
 
-            // 使用 DOMPurify 清理 HTML
+            // 使用 DOMPurify 清理 HTML（保留 highlight.js 需要的 class）
             const cleanHtml = window.DOMPurify.sanitize(htmlContent, {
-                ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote', 'a', 'hr', 'del', 's', 'table', 'thead', 'tbody', 'tr', 'td', 'th'],
+                ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote', 'a', 'hr', 'del', 's', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'span'],
                 ALLOWED_ATTR: ['href', 'title', 'class', 'align', 'style'],
                 ALLOW_DATA_ATTR: false
             });
 
             return cleanHtml;
         } catch (error) {
-            console.error('❌ Markdown 渲染失敗:', error);
+            console.error('❌ Markdown 渲染失败:', error);
             return this.escapeHtml(content);
+        }
+    };
+
+    /**
+     * 对容器内的代码块应用 highlight.js 高亮
+     */
+    UIManager.prototype.applyCodeHighlight = function(container) {
+        if (typeof window.hljs === 'undefined') return;
+        try {
+            container.querySelectorAll('pre code').forEach(function(block) {
+                window.hljs.highlightElement(block);
+            });
+        } catch (e) {
+            console.warn('highlight.js 高亮失败:', e);
         }
     };
 
@@ -452,21 +474,19 @@
     };
 
     /**
-     * 更新 AI 摘要內容
+     * 更新 AI 摘要内容
      */
     UIManager.prototype.updateAISummaryContent = function(summary) {
-        console.log('📝 更新 AI 摘要內容...', '內容長度:', summary ? summary.length : 'undefined');
-        console.log('📝 marked 可用:', typeof window.marked !== 'undefined');
-        console.log('📝 DOMPurify 可用:', typeof window.DOMPurify !== 'undefined');
+        console.log('📝 更新 AI 摘要内容...', '内容长度:', summary ? summary.length : 'undefined');
 
-        // 渲染 Markdown 內容
+        // 渲染 Markdown 内容
         const renderedContent = this.renderMarkdownSafely(summary);
-        console.log('📝 渲染後內容長度:', renderedContent ? renderedContent.length : 'undefined');
 
         const summaryContent = Utils.safeQuerySelector('#summaryContent');
         if (summaryContent) {
             summaryContent.innerHTML = renderedContent;
-            console.log('✅ 已更新分頁模式摘要內容（Markdown 渲染）');
+            this.applyCodeHighlight(summaryContent);
+            console.log('✅ 已更新分页模式摘要内容（Markdown 渲染）');
         } else {
             console.warn('⚠️ 找不到 #summaryContent 元素');
         }
@@ -474,7 +494,8 @@
         const combinedSummaryContent = Utils.safeQuerySelector('#combinedSummaryContent');
         if (combinedSummaryContent) {
             combinedSummaryContent.innerHTML = renderedContent;
-            console.log('✅ 已更新合併模式摘要內容（Markdown 渲染）');
+            this.applyCodeHighlight(combinedSummaryContent);
+            console.log('✅ 已更新合并模式摘要内容（Markdown 渲染）');
         } else {
             console.warn('⚠️ 找不到 #combinedSummaryContent 元素');
         }

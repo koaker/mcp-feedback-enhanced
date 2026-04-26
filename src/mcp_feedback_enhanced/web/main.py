@@ -306,8 +306,23 @@ class WebUIManager:
 
     def _setup_static_files(self):
         """設置靜態文件服務"""
-        # Web UI 靜態文件
         web_static_path = Path(__file__).parent / "static"
+
+        # 優先使用 Vue 3 SPA 構建產物（dist/）
+        dist_path = web_static_path / "dist"
+        if dist_path.exists():
+            self.app.mount(
+                "/assets",
+                StaticFiles(directory=str(dist_path / "assets")),
+                name="dist-assets",
+            )
+            self._spa_index = dist_path / "index.html"
+            debug_log(f"使用 Vue SPA 構建產物: {dist_path}")
+        else:
+            self._spa_index = None
+            debug_log("Vue SPA 構建產物不存在，回退到傳統模板模式")
+
+        # 掛載靜態文件（兼容舊模式）
         if web_static_path.exists():
             self.app.mount(
                 "/static", StaticFiles(directory=str(web_static_path)), name="static"
@@ -316,13 +331,23 @@ class WebUIManager:
             raise RuntimeError(f"Static files directory not found: {web_static_path}")
 
     def _setup_templates(self):
-        """設置模板引擎"""
-        # Web UI 模板
+        """設置模板引擎（兼容旧版 Jinja2 模板，SPA 模式下不使用）"""
+        # Web UI 模板（旧版 Jinja2，已迁移到 Vue SPA，保留做降级备用）
         web_templates_path = Path(__file__).parent / "templates"
-        if web_templates_path.exists():
-            self.templates = Jinja2Templates(directory=str(web_templates_path))
+        legacy_path = Path(__file__).parent / "_legacy_templates"
+        actual_path = web_templates_path if web_templates_path.exists() else legacy_path
+        if actual_path.exists():
+            # auto_reload=True 确保每次请求都检测文件变化
+            from jinja2 import Environment, FileSystemLoader
+            jinja_env = Environment(
+                loader=FileSystemLoader(str(actual_path)),
+                auto_reload=True,
+            )
+            self.templates = Jinja2Templates(env=jinja_env)
         else:
-            raise RuntimeError(f"Templates directory not found: {web_templates_path}")
+            # SPA 模式下不需要 Jinja2 模板，跳过
+            self.templates = None
+            debug_log("Templates directory not found, running in SPA-only mode")
 
     def create_session(self, project_directory: str, summary: str) -> str:
         """創建新的回饋會話 - 重構為單一活躍會話模式，保留標籤頁狀態"""

@@ -55,7 +55,13 @@ def setup_routes(manager: "WebUIManager"):
 
     @manager.app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
-        """統一回饋頁面 - 重構後的主頁面"""
+        """統一回饋頁面 - 優先使用 Vue SPA"""
+        # 如果有 Vue SPA 構建產物，直接 serve index.html
+        spa_index = getattr(manager, "_spa_index", None)
+        if spa_index and spa_index.exists():
+            return HTMLResponse(content=spa_index.read_text(encoding="utf-8"))
+
+        # 回退：舊模板模式
         # 獲取當前活躍會話
         current_session = manager.get_current_session()
 
@@ -83,6 +89,7 @@ def setup_routes(manager: "WebUIManager"):
                 "summary": current_session.summary,
                 "title": "Interactive Feedback - 回饋收集",
                 "version": __version__,
+                "cache_bust": int(time.time()),
                 "has_session": True,
                 "layout_mode": layout_mode,
             },
