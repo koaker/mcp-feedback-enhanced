@@ -596,7 +596,7 @@ class WebFeedbackSession:
 
                 process = psutil.Process()
                 memory_before = process.memory_info().rss
-            except:
+            except Exception:
                 pass
 
             # 1. 取消自動清理定時器
@@ -686,7 +686,7 @@ class WebFeedbackSession:
 
                 process = psutil.Process()
                 memory_after = process.memory_info().rss
-            except:
+            except Exception:
                 pass
 
             memory_freed = max(0, memory_before - memory_after)
@@ -753,7 +753,7 @@ class WebFeedbackSession:
 
                 process = psutil.Process()
                 memory_before = process.memory_info().rss
-            except:
+            except Exception:
                 pass
 
             # 1. 取消自動清理定時器
@@ -803,7 +803,7 @@ class WebFeedbackSession:
 
                 process = psutil.Process()
                 memory_after = process.memory_info().rss
-            except:
+            except Exception:
                 pass
 
             memory_freed = max(0, memory_before - memory_after)

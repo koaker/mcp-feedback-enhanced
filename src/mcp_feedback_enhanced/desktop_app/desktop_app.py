@@ -254,7 +254,7 @@ class DesktopApp:
                 debug_log(f"停止 Tauri 應用程式時發生錯誤: {e}")
                 try:
                     self.app_handle.kill()
-                except:
+                except Exception:
                     pass
             finally:
                 self.app_handle = None

@@ -1017,7 +1017,7 @@ class WebUIManager:
             stats["memory_usage_mb"] = round(
                 process.memory_info().rss / (1024 * 1024), 2
             )
-        except:
+        except ImportError:
             pass
 
         return stats
