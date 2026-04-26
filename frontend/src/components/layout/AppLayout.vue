@@ -19,14 +19,8 @@
           class="app-layout__icon-btn"
           :class="{ active: activeDrawer === 'logs' }"
           @click="toggleDrawer('logs')"
-          title="日志"
+          :title="i18n.t('logs.title')"
         >📋</button>
-        <button
-          class="app-layout__icon-btn"
-          :class="{ active: activeDrawer === 'terminal' }"
-          @click="toggleDrawer('terminal')"
-          title="命令执行"
-        >⌨</button>
         <button
           class="app-layout__icon-btn"
           @click="reloadPage"
@@ -100,28 +94,6 @@
         <div class="app-layout__resize-handle" @mousedown="startResize" />
       </div>
     </transition>
-
-    <!-- Terminal side drawer overlay -->
-    <transition name="overlay">
-      <div
-        v-if="activeDrawer === 'terminal'"
-        class="app-layout__side-overlay"
-        @click="closeDrawer"
-      />
-    </transition>
-
-    <!-- Terminal side drawer -->
-    <transition name="side-drawer">
-      <div v-if="activeDrawer === 'terminal'" class="app-layout__side-drawer">
-        <div class="app-layout__side-panel-header">
-          <span class="app-layout__side-panel-title">命令执行</span>
-          <button class="app-layout__side-panel-close" @click="closeDrawer">✕</button>
-        </div>
-        <div class="app-layout__side-panel-body">
-          <CommandRunner />
-        </div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -131,7 +103,6 @@ import WsStatusBadge from '../common/WsStatusBadge.vue'
 import SettingsPanel from '../settings/SettingsPanel.vue'
 import HistoryPanel from '../history/HistoryPanel.vue'
 import LogPanel from '../logs/LogPanel.vue'
-import CommandRunner from '../feedback/CommandRunner.vue'
 import { useI18nStore } from '../../stores/i18n'
 import { useSettingsStore } from '../../stores/settings'
 import { useSessionStore } from '../../stores/session'
@@ -141,11 +112,11 @@ const i18n = useI18nStore()
 const settingsStore = useSettingsStore()
 const sessionStore = useSessionStore()
 const { wsStatus } = storeToRefs(sessionStore)
-const activeDrawer = ref<'settings' | 'history' | 'logs' | 'terminal' | null>(null)
+const activeDrawer = ref<'settings' | 'history' | 'logs' | null>(null)
 const layoutMode = computed(() => settingsStore.settings.layoutMode || 'combined-vertical')
 const drawerWidth = ref(480)
 
-function toggleDrawer(panel: 'settings' | 'history' | 'logs' | 'terminal') {
+function toggleDrawer(panel: 'settings' | 'history' | 'logs') {
   activeDrawer.value = activeDrawer.value === panel ? null : panel
 }
 
@@ -319,40 +290,4 @@ function startResize(e: MouseEvent) {
 /* Side drawer slide-in transition */
 .side-drawer-enter-active, .side-drawer-leave-active { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
 .side-drawer-enter-from, .side-drawer-leave-to { transform: translateX(-100%); }
-
-/* Terminal drawer is wider */
-.app-layout__side-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.2rem 0.5rem;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.app-layout__side-panel-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.app-layout__side-panel-close {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-muted);
-  font-size: 1rem;
-  padding: 0 0.4rem;
-  cursor: pointer;
-  line-height: 1.6;
-}
-.app-layout__side-panel-close:hover { color: var(--text-primary); }
-
-.app-layout__side-panel-body {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  padding: 0.75rem 1rem;
-}
 </style>

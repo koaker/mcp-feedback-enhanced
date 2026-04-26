@@ -180,7 +180,6 @@ def setup_routes(manager: "WebUIManager"):
                 "project_directory": current_session.project_directory,
                 "summary": current_session.summary,
                 "feedback_completed": current_session.feedback_completed.is_set(),
-                "command_logs": current_session.command_logs,
                 "images_count": len(current_session.images),
             }
         )
@@ -737,12 +736,6 @@ async def handle_websocket_message(manager: "WebUIManager", session, data: dict)
         await session.submit_feedback(feedback, images, settings)
         # 提交後自動持久化到磁碟歷史
         _auto_save_session_to_history(manager, session)
-
-    elif message_type == "run_command":
-        # 執行命令
-        command = data.get("command", "")
-        if command.strip():
-            await session.run_command(command)
 
     elif message_type == "get_status":
         # 獲取會話狀態

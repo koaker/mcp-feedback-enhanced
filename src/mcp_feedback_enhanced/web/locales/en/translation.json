@@ -672,5 +672,16 @@
     "summaryLabel": "AI Summary",
     "feedbackLabel": "User Feedback",
     "projectDir": "Project Directory"
+  },
+  "logs": {
+    "title": "Logs",
+    "autoRefresh": "Auto refresh",
+    "empty": "No logs",
+    "loading": "Loading…",
+    "count": "{n} entries",
+    "refresh": "Refresh",
+    "clear": "Clear",
+    "close": "Close",
+    "filterAll": "All"
   }
 }

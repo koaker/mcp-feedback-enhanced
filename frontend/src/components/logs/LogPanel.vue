@@ -1,32 +1,32 @@
 <template>
   <div class="log-panel">
     <div class="log-panel__header">
-      <h3 class="log-panel__title">日志</h3>
+      <h3 class="log-panel__title">{{ i18n.t('logs.title') }}</h3>
       <div class="log-panel__header-actions">
         <select v-model="filterLevel" class="log-panel__filter">
-          <option value="">全部</option>
+          <option value="">{{ i18n.t('logs.filterAll') }}</option>
           <option value="INFO">INFO</option>
           <option value="WARN">WARN</option>
           <option value="ERROR">ERROR</option>
           <option value="DEBUG">DEBUG</option>
         </select>
-        <button class="log-panel__btn" @click="load" title="刷新">↻</button>
-        <button class="log-panel__btn" @click="clearLogs" title="清空">🗑</button>
-        <button class="log-panel__close" @click="emit('close')" title="关闭">✕</button>
+        <button class="log-panel__btn" @click="load" :title="i18n.t('logs.refresh')">↻</button>
+        <button class="log-panel__btn" @click="clearLogs" :title="i18n.t('logs.clear')">🗑</button>
+        <button class="log-panel__close" @click="emit('close')" :title="i18n.t('logs.close')">✕</button>
       </div>
     </div>
 
     <div class="log-panel__toolbar">
       <label class="log-panel__auto-refresh">
         <input type="checkbox" v-model="autoRefresh" />
-        自动刷新
+        {{ i18n.t('logs.autoRefresh') }}
       </label>
-      <span class="log-panel__count">共 {{ filteredLogs.length }} 条</span>
+      <span class="log-panel__count">{{ i18n.t('logs.count').replace('{n}', String(filteredLogs.length)) }}</span>
     </div>
 
     <div class="log-panel__body">
-      <div v-if="loading && filteredLogs.length === 0" class="log-panel__empty">加载中…</div>
-      <div v-else-if="filteredLogs.length === 0" class="log-panel__empty">暂无日志</div>
+      <div v-if="loading && filteredLogs.length === 0" class="log-panel__empty">{{ i18n.t('logs.loading') }}</div>
+      <div v-else-if="filteredLogs.length === 0" class="log-panel__empty">{{ i18n.t('logs.empty') }}</div>
       <div
         v-for="(entry, idx) in filteredLogs"
         :key="idx"
@@ -44,8 +44,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18nStore } from '../../stores/i18n'
 
 const emit = defineEmits<{ close: [] }>()
+const i18n = useI18nStore()
 
 interface LogEntry {
   ts: number

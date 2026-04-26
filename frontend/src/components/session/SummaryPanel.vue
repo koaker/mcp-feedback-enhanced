@@ -40,6 +40,28 @@ function applyHighlight() {
         hljs.highlightElement(block as HTMLElement)
       }
     })
+    // Inject copy buttons into every <pre> that doesn't already have one
+    bodyRef.value.querySelectorAll('pre').forEach((pre) => {
+      if (pre.querySelector('.copy-btn')) return
+      const btn = document.createElement('button')
+      btn.className = 'copy-btn'
+      btn.title = '复制'
+      btn.textContent = '⎘'
+      btn.addEventListener('click', () => {
+        const code = pre.querySelector('code')
+        const text = code ? code.innerText : pre.innerText
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = '✓'
+          btn.classList.add('copy-btn--copied')
+          setTimeout(() => {
+            btn.textContent = '⎘'
+            btn.classList.remove('copy-btn--copied')
+          }, 1500)
+        })
+      })
+      pre.style.position = 'relative'
+      pre.appendChild(btn)
+    })
   })
 }
 
@@ -160,4 +182,31 @@ const shortDir = computed(() => {
 .summary-panel__body :deep(th) { background: rgba(99, 102, 241, 0.1); }
 
 :deep(.summary-panel__empty) { color: var(--text-muted); font-style: italic; }
+
+:deep(.copy-btn) {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+  line-height: 1.6;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+:deep(pre:hover .copy-btn) { opacity: 1; }
+:deep(.copy-btn:hover) {
+  background: rgba(99, 102, 241, 0.3);
+  color: var(--text-primary);
+}
+:deep(.copy-btn--copied) {
+  opacity: 1;
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.1);
+}
 </style>

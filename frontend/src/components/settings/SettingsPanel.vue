@@ -45,13 +45,19 @@
     <!-- Enable base64 detail -->
     <div class="settings-panel__row">
       <label>{{ i18n.t('settings.enableBase64Detail') }}</label>
-      <input type="checkbox" v-model="settings.enable_base64_detail" @change="save" />
+      <label class="toggle">
+        <input type="checkbox" v-model="settings.enable_base64_detail" @change="save" />
+        <span class="toggle__track"><span class="toggle__thumb" /></span>
+      </label>
     </div>
 
     <!-- Auto submit -->
     <div class="settings-panel__row">
       <label>{{ i18n.t('settings.autoSubmit') }}</label>
-      <input type="checkbox" v-model="settings.autoSubmitEnabled" @change="save" />
+      <label class="toggle">
+        <input type="checkbox" v-model="settings.autoSubmitEnabled" @change="save" />
+        <span class="toggle__track"><span class="toggle__thumb" /></span>
+      </label>
     </div>
     <div class="settings-panel__row" v-if="settings.autoSubmitEnabled">
       <label>{{ i18n.t('settings.autoSubmitSeconds') }}</label>
@@ -68,7 +74,10 @@
     <!-- Timeout -->
     <div class="settings-panel__row">
       <label>{{ i18n.t('settings.timeout') }}</label>
-      <input type="checkbox" v-model="settings.timeoutEnabled" @change="onTimeoutChange" />
+      <label class="toggle">
+        <input type="checkbox" v-model="settings.timeoutEnabled" @change="onTimeoutChange" />
+        <span class="toggle__track"><span class="toggle__thumb" /></span>
+      </label>
     </div>
     <div class="settings-panel__row" v-if="settings.timeoutEnabled">
       <label>{{ i18n.t('settings.timeoutSeconds') }}</label>
@@ -255,4 +264,40 @@ async function restartServer() {
 }
 .settings-panel__restart:hover:not(:disabled) { background: rgba(59, 130, 246, 0.2); }
 .settings-panel__restart:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Toggle switch */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.toggle input { display: none; }
+.toggle__track {
+  width: 36px;
+  height: 20px;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+}
+.toggle input:checked ~ .toggle__track {
+  background: rgba(99, 102, 241, 0.7);
+  border-color: rgba(99, 102, 241, 0.9);
+}
+.toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle input:checked ~ .toggle__track .toggle__thumb {
+  transform: translateX(16px);
+  background: #fff;
+}
 </style>

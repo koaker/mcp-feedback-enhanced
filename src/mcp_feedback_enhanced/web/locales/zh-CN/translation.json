@@ -692,5 +692,16 @@
     "summaryLabel": "AI 工作摘要",
     "feedbackLabel": "用户回馈",
     "projectDir": "项目目录"
+  },
+  "logs": {
+    "title": "日志",
+    "autoRefresh": "自动刷新",
+    "empty": "暂无日志",
+    "loading": "加载中…",
+    "count": "共 {n} 条",
+    "refresh": "刷新",
+    "clear": "清空",
+    "close": "关闭",
+    "filterAll": "全部"
   }
 }
